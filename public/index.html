@@ -20,7 +20,6 @@
     input, select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box; font-size: 0.9rem; }
     button.btn-main { background: #e52e4d; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; color: #fff; text-transform: uppercase; }
     
-    /* ESTILOS DA LISTA DE ALUNOS COM FOTO E EXCLUSÃO */
     .aluno-card { background: #000; border-left: 4px solid #e52e4d; padding: 10px; border-radius: 6px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }
     .aluno-info { display: flex; align-items: center; gap: 10px; }
     .aluno-info img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #e52e4d; }
@@ -29,6 +28,14 @@
     .card-stat { background: #000; border: 1px solid #e52e4d; padding: 12px; border-radius: 6px; margin-top: 10px; text-align: center; }
     .card-stat h3 { margin: 0; color: #fff; font-size: 1.5rem; }
     .card-stat p { margin: 5px 0 0 0; color: #8d8d99; font-size: 0.8rem; }
+
+    /* ESTILO DO COMPROVANTE PARA IMPRESSÃO TÉRMICA */
+    @media print {
+      body * { visibility: hidden; }
+      #comprovanteTermico, #comprovanteTermico * { visibility: visible; }
+      #comprovanteTermico { position: absolute; left: 0; top: 0; width: 100%; background: #fff; color: #000; padding: 10px; }
+    }
+    .recibo-box { background: #000; border: 1px dashed #e52e4d; padding: 12px; border-radius: 6px; margin-top: 15px; font-family: monospace; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -41,7 +48,7 @@
     <button type="button" class="tab-btn active" onclick="abrirAba('academia')">🏢 Academia</button>
     <button type="button" class="tab-btn" onclick="abrirAba('alunos')">🥋 Alunos & Graduação</button>
     <button type="button" class="tab-btn" onclick="abrirAba('caixa')">💰 Caixa</button>
-    <button type="button" class="tab-btn" onclick="abrirAba('pagamento')">💳 Pagamento</button>
+    <button type="button" class="tab-btn" onclick="abrirAba('pagamento')">💳 Pagamento & Recibo</button>
     <button type="button" class="tab-btn" onclick="abrirAba('estatisticas')">📊 Estatísticas</button>
   </div>
 
@@ -52,24 +59,16 @@
     <input type="text" id="cnpjAcademia" placeholder="00.000.000/0001-00">
     <label>Endereço Completo</label>
     <input type="text" id="endAcademia" placeholder="Rua, Número, Cidade">
-    <label>Horário de Funcionamento</label>
-    <div style="display: flex; gap: 8px;">
-      <input type="time" id="horaAbertura">
-      <input type="time" id="horaFechamento">
-    </div>
     <button type="button" class="btn-main" onclick="alert('Dados salvos!')">Salvar Academia</button>
   </div>
 
-  <!-- ABA ALUNOS & GRADUAÇÃO (TUDO EM UMA SÓ ABA) -->
+  <!-- ABA ALUNOS -->
   <div id="tab-alunos" class="tab-content">
     <h3>🥋 Cadastro & Gestão de Alunos</h3>
-    
     <label>Foto do Aluno</label>
     <input type="file" id="fotoAlunoInput" accept="image/*">
-
     <label>Nome Completo</label>
     <input type="text" id="nomeAluno" placeholder="Nome do Aluno">
-
     <div style="display: flex; gap: 8px;">
       <div style="flex: 1;">
         <label>Faixa Etária</label>
@@ -91,11 +90,8 @@
         </select>
       </div>
     </div>
-
-    <button type="button" class="btn-main" onclick="cadastrarAluno()">Cadastrar Aluno no Tatame</button>
-
+    <button type="button" class="btn-main" onclick="cadastrarAluno()">Cadastrar Aluno</button>
     <hr style="border: 0.5px solid #333; margin: 20px 0;">
-
     <h3>📋 Alunos Cadastrados</h3>
     <div id="listaAlunos">
       <p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado.</p>
@@ -105,25 +101,49 @@
   <!-- ABA CAIXA -->
   <div id="tab-caixa" class="tab-content">
     <h3>💰 Controle de Caixa</h3>
-    <label>Descrição do Lançamento</label>
+    <label>Descrição</label>
     <input type="text" id="descCaixa" placeholder="Ex: Mensalidade João">
     <label>Valor (R$)</label>
     <input type="number" id="valCaixa" placeholder="150.00">
-    <button type="button" class="btn-main" onclick="alert('Lançamento efetuado!')">Lançar no Caixa</button>
+    <button type="button" class="btn-main" onclick="alert('Lançado no caixa!')">Lançar no Caixa</button>
   </div>
 
-  <!-- ABA PAGAMENTO -->
+  <!-- ABA PAGAMENTO & IMPRESSÃO -->
   <div id="tab-pagamento" class="tab-content">
-    <h3>💳 Formas de Pagamento</h3>
-    <label>Método de Pagamento</label>
-    <select id="metodoPgto">
-      <option value="Pix">PIX</option>
+    <h3>💳 Emitir Comprovante de Pagamento</h3>
+    <label>Nome do Aluno / Pagador</label>
+    <input type="text" id="pagadorNome" placeholder="Nome do Aluno">
+
+    <label>Valor Pago (R$)</label>
+    <input type="number" id="pagadorValor" placeholder="150.00">
+
+    <label>Forma de Pagamento</label>
+    <select id="pagadorMetodo">
+      <option value="PIX">PIX</option>
       <option value="Dinheiro">Dinheiro</option>
-      <option value="Cartao">Cartão de Crédito/Débito</option>
+      <option value="Cartão de Crédito/Débito">Cartão</option>
     </select>
-    <label>Chave PIX (Se aplicável)</label>
-    <input type="text" id="chavePix" placeholder="CNPJ ou E-mail">
-    <button type="button" class="btn-main" onclick="alert('Configuração salva!')">Salvar Pagamento</button>
+
+    <button type="button" class="btn-main" onclick="gerarRecibo()">🖨️ Gerar Recibo para Impressora</button>
+
+    <div id="reciboArea" style="display:none;">
+      <div class="recibo-box" id="comprovanteTermico">
+        <center>
+          <strong>TATAMEONE - GESTÃO DE LUTAS</strong><br>
+          -----------------------------------<br>
+          <strong>COMPROVANTE DE PAGAMENTO</strong><br>
+        </center>
+        <p style="margin: 5px 0;">Data: <span id="reciboData"></span></p>
+        <p style="margin: 5px 0;">Pagador: <span id="reciboNome"></span></p>
+        <p style="margin: 5px 0;">Valor: R$ <span id="reciboValor"></span></p>
+        <p style="margin: 5px 0;">Método: <span id="reciboMetodo"></span></p>
+        <center>
+          -----------------------------------<br>
+          <small>Obrigado por treinar conosco! OSS!</small>
+        </center>
+      </div>
+      <button type="button" class="btn-main" style="background: #00b37e; margin-top: 10px;" onclick="window.print()">Imprimir na Térmica Bluetooth</button>
+    </div>
   </div>
 
   <!-- ABA ESTATÍSTICAS -->
@@ -132,10 +152,6 @@
     <div class="card-stat">
       <h3 id="statAlunos">0</h3>
       <p>Total de Alunos</p>
-    </div>
-    <div class="card-stat">
-      <h3 id="statCaixa">R$ 0,00</h3>
-      <p>Saldo em Caixa</p>
     </div>
   </div>
 
@@ -155,16 +171,11 @@
       const faixa = document.getElementById('selFaixa').value;
       const fotoInput = document.getElementById('fotoAlunoInput');
 
-      if (!nome) {
-        alert('Por favor, digite o nome do aluno!');
-        return;
-      }
+      if (!nome) { alert('Digite o nome!'); return; }
 
       if (fotoInput.files && fotoInput.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-          salvarNovoAluno(nome, categoria, faixa, e.target.result);
-        };
+        reader.onload = function(e) { salvarNovoAluno(nome, categoria, faixa, e.target.result); };
         reader.readAsDataURL(fotoInput.files[0]);
       } else {
         salvarNovoAluno(nome, categoria, faixa, '');
@@ -172,18 +183,14 @@
     }
 
     function salvarNovoAluno(nome, categoria, faixa, foto) {
-      const id = Date.now();
-      alunos.push({ id, nome, categoria, faixa, foto });
-      
-      // Limpa os campos
+      alunos.push({ id: Date.now(), nome, categoria, faixa, foto });
       document.getElementById('nomeAluno').value = '';
       document.getElementById('fotoAlunoInput').value = '';
-
       renderizarAlunos();
     }
 
     function excluirAluno(id) {
-      if (confirm('Deseja realmente excluir este aluno?')) {
+      if (confirm('Excluir aluno?')) {
         alunos = alunos.filter(a => a.id !== id);
         renderizarAlunos();
       }
@@ -192,16 +199,13 @@
     function renderizarAlunos() {
       const container = document.getElementById('listaAlunos');
       document.getElementById('statAlunos').innerText = alunos.length;
-
       if (alunos.length === 0) {
         container.innerHTML = '<p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado.</p>';
         return;
       }
-
       container.innerHTML = '';
       alunos.forEach(a => {
         const fotoTag = a.foto ? `<img src="${a.foto}" alt="Foto">` : `<div style="width:45px;height:45px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🥋</div>`;
-        
         container.innerHTML += `
           <div class="aluno-card">
             <div class="aluno-info">
@@ -215,6 +219,24 @@
           </div>
         `;
       });
+    }
+
+    function gerarRecibo() {
+      const nome = document.getElementById('pagadorNome').value.toUpperCase();
+      const valor = parseFloat(document.getElementById('pagadorValor').value);
+      const metodo = document.getElementById('pagadorMetodo').value;
+
+      if (!nome || isNaN(valor)) {
+        alert('Preencha o nome e o valor do pagamento!');
+        return;
+      }
+
+      document.getElementById('reciboData').innerText = new Date().toLocaleString();
+      document.getElementById('reciboNome').innerText = nome;
+      document.getElementById('reciboValor').innerText = valor.toFixed(2);
+      document.getElementById('reciboMetodo').innerText = metodo;
+
+      document.getElementById('reciboArea').style.display = 'block';
     }
   </script>
 </body>
