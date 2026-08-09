@@ -3,12 +3,17 @@
   "name": "TatameOne - Gestão de Dojô",
   "icons": [
     {
-      "src": "logo tatameone~2.jpg",
+      "src": "logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo.jpg",
       "type": "image/jpeg",
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "background_color": "#121214",
   "theme_color": "#e52e3d",
   "display": "standalone"
