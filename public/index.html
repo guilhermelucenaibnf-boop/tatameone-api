@@ -17,9 +17,22 @@
     label { display: block; margin-top: 10px; font-size: 0.85rem; color: #a8a8b3; }
     input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
     button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
+    .btn-print { background: #00b37e; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 10px; cursor: pointer; }
+    
+    /* ESTILO DO COMPROVANTE */
     .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; text-align: center; }
     .receipt-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff334b; margin-bottom: 10px; }
     .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; }
+
+    /* REGRAS EXCLUSIVAS PARA IMPRESSÃO (Wi-Fi / Bluetooth) */
+    @media print {
+      body * { visibility: hidden; }
+      #areaComprovante, #areaComprovante * { visibility: visible; }
+      #areaComprovante { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+      .receipt-card { border: 1px solid #000; background: #fff; color: #000; }
+      .receipt-card h4 { color: #000; }
+      .btn-print { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -76,11 +89,13 @@
     <div id="areaComprovante" style="display: none;">
       <div class="receipt-card">
         <img id="compFoto" src="" alt="Foto">
-        <h4>🧾 COMPROVANTE</h4>
+        <h4>🧾 COMPROVANTE DE PAGAMENTO</h4>
         <p><strong>Aluno:</strong> <span id="compAluno">-</span></p>
         <p><strong>Idade:</strong> <span id="compIdade">-</span></p>
         <p><strong>Graduação:</strong> <span id="compFaixa">-</span></p>
         <p><strong>Valor:</strong> R$ <span id="compValor">0,00</span></p>
+        
+        <button type="button" class="btn-print" onclick="window.print()">🖨️ Imprimir (Bluetooth / Wi-Fi)</button>
       </div>
     </div>
   </div>
@@ -117,7 +132,6 @@
       document.getElementById('compFaixa').innerText = faixa;
       document.getElementById('compValor').innerText = parseFloat(valor || 0).toFixed(2);
 
-      // Carregar Foto
       if (fotoInput.files && fotoInput.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
