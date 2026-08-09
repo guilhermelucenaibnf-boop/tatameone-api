@@ -1,0 +1,16 @@
+{
+  "name": "TatameOne",
+  "short_name": "TatameOne",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121214",
+  "theme_color": "#8257e5",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3048/3048381.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
