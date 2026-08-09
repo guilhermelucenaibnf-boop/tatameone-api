@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -16,7 +15,7 @@
       --success: #04d361;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; pb: 40px; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
     h1 { color: var(--primary); text-align: center; margin-bottom: 16px; }
     
     /* Menu de Abas */
@@ -47,25 +46,31 @@
 
   <!-- Navegação por Abas -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('academia')">Academia</button>
+    <button class="tab-btn active" onclick="switchTab('perfil')">Perfil / Academia</button>
     <button class="tab-btn" onclick="switchTab('pagamentos')">Pagamentos</button>
   </div>
 
-  <!-- ABA ACADEMIA -->
-  <div id="tab-academia" class="tab-content active">
+  <!-- ABA PERFIL / ACADEMIA -->
+  <div id="tab-perfil" class="tab-content active">
     <div class="card">
-      <h3>Dados da Academia</h3>
-      <form id="formAcademia">
-        <label>Nome da Academia</label>
-        <input type="text" id="acadNome" placeholder="Ex: Gracie Barra Central" required>
+      <h3>Dados do Perfil</h3>
+      <form id="formPerfil">
+        <label>Tipo de Cadastro</label>
+        <select id="tipoPessoa" onchange="toggleTipoPessoa()">
+          <option value="PJ">Pessoa Jurídica (Academia / CNPJ)</option>
+          <option value="PF">Pessoa Física (Instrutor / CPF)</option>
+        </select>
 
-        <label>CNPJ</label>
-        <input type="text" id="acadCnpj" placeholder="00.000.000/0001-00" required>
+        <label id="lblNome">Nome da Academia</label>
+        <input type="text" id="nomePerfil" placeholder="Ex: Gracie Barra Central" required>
+
+        <label id="lblDoc">CNPJ</label>
+        <input type="text" id="docPerfil" placeholder="00.000.000/0001-00" required>
 
         <label>Endereço Completo</label>
-        <input type="text" id="acadEndereco" placeholder="Rua, Número, Bairro, Cidade" required>
+        <input type="text" id="enderecoPerfil" placeholder="Rua, Número, Bairro, Cidade" required>
 
-        <button type="submit">Salvar Dados da Academia</button>
+        <button type="submit">Salvar Perfil</button>
       </form>
     </div>
   </div>
@@ -100,6 +105,24 @@
   <script>
     const API_URL = 'https://tatameone-api.onrender.com';
 
+    // Troca entre PJ e PF nos campos do formulário
+    function toggleTipoPessoa() {
+      const tipo = document.getElementById('tipoPessoa').value;
+      const lblNome = document.getElementById('lblNome');
+      const lblDoc = document.getElementById('lblDoc');
+      const docInput = document.getElementById('docPerfil');
+
+      if (tipo === 'PF') {
+        lblNome.innerText = 'Nome Completo do Responsável / Instrutor';
+        lblDoc.innerText = 'CPF';
+        docInput.placeholder = '000.000.000-00';
+      } else {
+        lblNome.innerText = 'Nome da Academia';
+        lblDoc.innerText = 'CNPJ';
+        docInput.placeholder = '00.000.000/0001-00';
+      }
+    }
+
     // Troca de Abas
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -111,13 +134,14 @@
       if (tab === 'pagamentos') fetchPagamentos();
     }
 
-    // --- ACADEMIA ---
-    document.getElementById('formAcademia').addEventListener('submit', async (e) => {
+    // --- PERFIL (PF / PJ) ---
+    document.getElementById('formPerfil').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
-        nome: document.getElementById('acadNome').value,
-        cnpj: document.getElementById('acadCnpj').value,
-        endereco: document.getElementById('acadEndereco').value
+        tipoPessoa: document.getElementById('tipoPessoa').value,
+        nome: document.getElementById('nomePerfil').value,
+        documento: document.getElementById('docPerfil').value,
+        endereco: document.getElementById('enderecoPerfil').value
       };
 
       try {
@@ -126,9 +150,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        alert('Dados da academia salvos com sucesso!');
+        alert('Perfil salvo com sucesso!');
       } catch (err) {
-        alert('Erro ao salvar dados da academia.');
+        alert('Erro ao salvar perfil.');
       }
     });
 
