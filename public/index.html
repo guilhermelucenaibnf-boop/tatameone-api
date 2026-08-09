@@ -209,12 +209,41 @@ jpg">
     }
 
     function switchTab(tab) {
-  // Esconde todas as abas e remove active dos botoes
-  document.querySelectorAll('.tab-content').forEach(c => {
+  // 1. Esconde todo o conteudo
+  const contents = document.querySelectorAll('.tab-content');
+  contents.forEach(c => {
     c.classList.remove('active');
     c.style.display = 'none';
   });
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  // 2. Desativa todos os botoes
+  const btns = document.querySelectorAll('.tab-btn');
+  btns.forEach(b => b.classList.remove('active'));
+
+  // 3. Ativa a aba selecionada
+  const el = document.getElementById('tab-' + tab);
+  if (el) {
+    el.classList.add('active');
+    el.style.display = 'block';
+  }
+
+  // 4. Ativa o botao selecionado
+  const btnMap = { 'perfil': 0, 'pagamentos': 1, 'stats': 2 };
+  if (btns[btnMap[tab]]) {
+    btns[btnMap[tab]].classList.add('active');
+  }
+
+  // 5. Tenta carregar os dados sem travar a interface
+  if (tab === 'pagamentos' || tab === 'stats') {
+    try {
+      if (typeof fetchPagamentos === 'function') {
+        fetchPagamentos();
+      }
+    } catch (e) {
+      console.error('Erro ao buscar pagamentos:', e);
+    }
+  }
+}
 
   // Mostra a aba selecionada
   const el = document.getElementById('tab-' + tab);
