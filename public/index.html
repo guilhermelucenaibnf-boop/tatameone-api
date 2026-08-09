@@ -3,78 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TatameOne - Vermelho & Preto</title>
+  <title>TatameOne - Gestão</title>
   <style>
     body { background-color: #000000; color: #ffffff; font-family: sans-serif; margin: 0; padding: 15px; }
     .header { text-align: center; margin-bottom: 20px; }
     .header h1 { margin: 0; color: #e52e4d; text-transform: uppercase; letter-spacing: 2px; }
-    .header p { color: #8d8d99; font-size: 0.9rem; margin-top: 5px; }
-    .tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
-    .tab-btn { background-color: #1a1a1a; border: 1px solid #323238; color: #c4c4cc; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; text-align: center; font-size: 0.8rem; }
+    .tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { background-color: #1a1a1a; border: 1px solid #323238; color: #c4c4cc; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
     .tab-btn.active { background-color: #e52e4d; color: #ffffff; border-color: #e52e4d; }
     .tab-content { display: none; background: #121214; padding: 16px; border-radius: 8px; border: 1px solid #333; }
     .tab-content.active { display: block !important; }
-    label { display: block; margin-top: 10px; font-size: 0.85rem; color: #e52e4d; font-weight: bold; }
-    input, select, button { width: 100%; padding: 12px; margin-top: 5px; border-radius: 6px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box; }
-    button.btn-main { background: #e52e4d; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; font-size: 1rem; color: #fff; text-transform: uppercase; }
-    .card-stat { background: #121214; border: 1px solid #e52e4d; padding: 15px; border-radius: 6px; margin-top: 10px; text-align: center; }
-    .card-stat h3 { margin: 0; color: #ffffff; font-size: 1.8rem; }
-    .aluno-card { background: #121214; border-left: 4px solid #e52e4d; padding: 12px; border-radius: 4px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
-    .btn-delete { background: #444; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+    label { display: block; margin-top: 10px; font-size: 0.8rem; color: #e52e4d; font-weight: bold; }
+    input, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box; }
+    button.btn-save { background: #e52e4d; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; color: #fff; }
   </style>
 </head>
 <body>
 
   <div class="header">
     <h1>🥋 TatameOne</h1>
-    <p>Gestão de Academias</p>
   </div>
 
   <div class="tabs">
-    <button type="button" class="tab-btn active" onclick="abrirAba('alunos')">👥 Alunos</button>
-    <button type="button" class="tab-btn" onclick="abrirAba('caixa')">💰 Caixa</button>
-    <button type="button" class="tab-btn" onclick="abrirAba('estatisticas')">📊 Stats</button>
+    <button class="tab-btn active" onclick="abrirAba('config')">⚙️ Config</button>
+    <button class="tab-btn" onclick="abrirAba('alunos')">👥 Alunos</button>
   </div>
 
-  <div id="tab-alunos" class="tab-content active">
-    <h3>📝 Cadastro de Aluno</h3>
-    <label>Nome Completo</label>
-    <input type="text" id="nomeAluno" placeholder="NOME DO ALUNO">
-    <button type="button" class="btn-main" onclick="cadastrarAluno()">Cadastrar</button>
-    <div id="listaAlunos"></div>
+  <!-- ABA CONFIGURAÇÕES -->
+  <div id="tab-config" class="tab-content active">
+    <h3>🏢 Dados da Academia</h3>
+    <label>CNPJ</label>
+    <input type="text" id="cnpjAcademia" placeholder="00.000.000/0001-00">
+    
+    <label>Endereço Completo</label>
+    <input type="text" id="endAcademia" placeholder="Rua, Número, Cidade">
+
+    <label>Horário de Funcionamento (Abertura)</label>
+    <input type="time" id="horaAbertura">
+
+    <label>Horário de Fechamento</label>
+    <input type="time" id="horaFechamento">
+
+    <button class="btn-save" onclick="salvarConfig()">💾 Salvar Dados</button>
   </div>
 
-  <div id="tab-caixa" class="tab-content">
-    <h3>💵 Caixa</h3>
-    <input type="number" id="valorCaixa" placeholder="Valor R$">
-    <button type="button" class="btn-main" onclick="lancarCaixa()">Registrar</button>
-    <div id="listaCaixa"></div>
-  </div>
-
-  <div id="tab-estatisticas" class="tab-content">
-    <h3>📊 Painel de Controle</h3>
-    <div class="card-stat">
-      <h3 id="statTotalAlunos">0</h3>
-      <p>Alunos Matriculados</p>
-    </div>
+  <!-- ABA ALUNOS -->
+  <div id="tab-alunos" class="tab-content">
+    <h3>📝 Lista de Alunos</h3>
+    <p style="font-size: 0.85rem; color: #8d8d99;">Sistema de gestão de alunos ativo.</p>
   </div>
 
   <script>
-    let alunos = [];
-    let caixa = [];
     function abrirAba(t) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       event.target.classList.add('active');
       document.getElementById('tab-' + t).classList.add('active');
     }
-    function cadastrarAluno() {
-      const nome = document.getElementById('nomeAluno').value;
-      if(!nome) return;
-      alunos.push(nome);
-      document.getElementById('nomeAluno').value = '';
-      document.getElementById('statTotalAlunos').innerText = alunos.length;
-      alert('Aluno cadastrado!');
+
+    function salvarConfig() {
+      alert('Dados da academia salvos com sucesso!');
     }
   </script>
 </body>
