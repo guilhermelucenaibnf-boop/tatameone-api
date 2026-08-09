@@ -10,15 +10,16 @@
     .header h1 { margin: 0; color: #ff334b; }
     .header p { color: #8d8d99; font-size: 0.9rem; margin-top: 5px; }
     .tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; position: relative; z-index: 10; }
-    .tab-btn { background-color: #202024; border: 1px solid #323238; color: #c4c4cc; padding: 12px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; max-width: 130px; text-align: center; font-size: 0.85rem; -webkit-tap-highlight-color: transparent; }
+    .tab-btn { background-color: #202024; border: 1px solid #323238; color: #c4c4cc; padding: 12px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; max-width: 130px; text-align: center; font-size: 0.85rem; }
     .tab-btn.active { background-color: #ff334b; color: #ffffff; border-color: #ff334b; }
     .tab-content { display: none; background: #202024; padding: 16px; border-radius: 8px; border: 1px solid #323238; }
     .tab-content.active { display: block !important; }
     label { display: block; margin-top: 10px; font-size: 0.85rem; color: #a8a8b3; }
     input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
     button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
-    .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; }
-    .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; text-align: center; }
+    .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; text-align: center; }
+    .receipt-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff334b; margin-bottom: 10px; }
+    .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; }
   </style>
 </head>
 <body>
@@ -43,6 +44,9 @@
   <div id="tab-pagamentos" class="tab-content">
     <h3>🥋 Cadastro de Aluno</h3>
     <form id="formAluno">
+      <label>Foto do Aluno</label>
+      <input type="file" id="fotoInput" accept="image/*">
+      
       <label>Nome do Aluno</label>
       <input type="text" id="nomeAluno" placeholder="Ex: João Silva" required>
       
@@ -54,7 +58,7 @@
         <option value="Master">Master</option>
       </select>
 
-      <label>Faixa / Graduação</label>
+      <label>Graduação</label>
       <select id="faixaAluno">
         <option value="Branca">Branca</option>
         <option value="Azul">Azul</option>
@@ -71,6 +75,7 @@
 
     <div id="areaComprovante" style="display: none;">
       <div class="receipt-card">
+        <img id="compFoto" src="" alt="Foto">
         <h4>🧾 COMPROVANTE</h4>
         <p><strong>Aluno:</strong> <span id="compAluno">-</span></p>
         <p><strong>Idade:</strong> <span id="compIdade">-</span></p>
@@ -105,11 +110,22 @@
       const idade = document.getElementById('idadeAluno').value;
       const faixa = document.getElementById('faixaAluno').value;
       const valor = document.getElementById('valorPagamento').value;
+      const fotoInput = document.getElementById('fotoInput');
 
       document.getElementById('compAluno').innerText = nome;
       document.getElementById('compIdade').innerText = idade;
       document.getElementById('compFaixa').innerText = faixa;
       document.getElementById('compValor').innerText = parseFloat(valor || 0).toFixed(2);
+
+      // Carregar Foto
+      if (fotoInput.files && fotoInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('compFoto').src = e.target.result;
+        }
+        reader.readAsDataURL(fotoInput.files[0]);
+      }
+      
       document.getElementById('areaComprovante').style.display = 'block';
     }
   </script>
