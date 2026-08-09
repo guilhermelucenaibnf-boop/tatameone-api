@@ -209,11 +209,29 @@ jpg">
     }
 
     function switchTab(tab) {
+  // Esconde todas as abas e remove active dos botoes
+  document.querySelectorAll('.tab-content').forEach(c => {
+    c.classList.remove('active');
+    c.style.display = 'none';
+  });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  
+
+  // Mostra a aba selecionada
   const el = document.getElementById('tab-' + tab);
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+    el.style.display = 'block';
+  }
+
+  // Ativa o botao correto
+  const btnMap = { 'perfil': 0, 'pagamentos': 1, 'stats': 2 };
+  const btns = document.querySelectorAll('.tab-btn');
+  if (btns[btnMap[tab]]) btns[btnMap[tab]].classList.add('active');
+
+  if (tab === 'pagamentos' || tab === 'stats') {
+    fetchPagamentos();
+  }
+}
 
   const btnMap = { 'perfil': 0, 'pagamentos': 1, 'stats': 2 };
   const btns = document.querySelectorAll('.tab-btn');
