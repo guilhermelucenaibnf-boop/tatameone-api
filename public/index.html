@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TatameOne - Master Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #121214; color: #e1e1e6; padding: 15px; }
+    .container { max-width: 650px; margin: 0 auto; }
+    h1 { color: #00b37e; text-align: center; margin-bottom: 15px; font-size: 28px; }
+    .card { background: #202024; padding: 18px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #323238; }
+    .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+    .stat-box { background: #29292e; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #323238; }
+    .stat-box h4 { font-size: 11px; color: #8d8d99; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-box span { font-size: 20px; font-weight: bold; color: #00b37e; }
+    .progress-bar-bg { background: #323238; border-radius: 10px; height: 12px; overflow: hidden; margin-top: 8px; }
+    .progress-bar-fill { background: #00b37e; height: 100%; width: 0%; transition: width 0.3s ease; }
+    input, select, textarea, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 6px; border: 1px solid #323238; background: #121214; color: #fff; }
+    button { background: #00875f; font-weight: bold; cursor: pointer; border: none; margin-top: 12px; }
+    button:hover { background: #00b37e; }
+    .btn-secondary { background: #29292e; border: 1px solid #00b37e; color: #00b37e; }
+    .btn-sair { background: #f75a68; margin-top: 10px; }
+    .treino-item { background: #29292e; padding: 12px; border-radius: 8px; margin-top: 10px; position: relative; }
+    .treino-item small { color: #8d8d99; display: block; margin-bottom: 4px; font-size: 11px; }
+    .btn-del { background: #f75a68; width: auto; padding: 4px 8px; position: absolute; top: 10px; right: 10px; font-size: 11px; }
+    .toggle-link { color: #00b37e; text-align: center; display: block; margin-top: 15px; cursor: pointer; font-size: 14px; text-decoration: underline; }
+    
+    /* CAMPO DE SENHA COM BOTÃO VER/OCULTAR */
+    .password-wrapper { position: relative; width: 100%; }
+    .password-wrapper input { width: 100%; padding-right: 45px; }
+    .btn-toggle-password {
+      position: absolute;
+      right: 10px;
+      top: 8px;
+      width: auto;
+      margin: 0;
+      padding: 6px 10px;
+      background: transparent;
+      border: none;
+      color: #8d8d99;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .btn-toggle-password:hover { background: transparent; color: #00b37e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🥋 TatameOne</h1>
+
+    <!-- FORM LOGIN -->
+    <div id="login-box" class="card">
+      <h3 style="margin-bottom: 10px;">Login do Atleta</h3>
+      <input type="email" id="login-email" value="azul@tatameone.com" placeholder="Seu E-mail">
+      
+      <div class="password-wrapper">
+        <input type="password" id="login-senha" value="minhasenhasegura" placeholder="Sua Senha">
+        <button type="button" class="btn-toggle-password" onclick="toggleSenha('login-senha', this)">👁️</button>
+      </div>
+
+      <button onclick="fazerLogin()">Entrar no Tatame</button>
+      <span class="toggle-link" onclick="alternarForm(true)">Não tem conta? Cadastrar novo atleta</span>
+    </div>
+
+    <!-- FORM CADASTRO DE USUÁRIO -->
+    <div id="cadastro-box" class="card" style="display: none;">
+      <h3 style="margin-bottom: 10px;">Cadastrar Novo Atleta</h3>
+      <input type="text" id="cad-nome" placeholder="Nome Completo">
+      <input type="email" id="cad-email" placeholder="E-mail">
+      
+      <div class="password-wrapper">
+        <input type="password" id="cad-senha" placeholder="Senha">
+        <button type="button" class="btn-toggle-password" onclick="toggleSenha('cad-senha', this)">👁️</button>
+      </div>
+
+      <select id="cad-faixa">
+        <option value="BRANCA">Faixa Branca</option>
+        <option value="AZUL" selected>Faixa Azul</option>
+        <option value="ROXA">Faixa Roxa</option>
+        <option value="MARROM">Faixa Marrom</option>
+        <option value="PRETA">Faixa Preta</option>
+      </select>
+      <select id="cad-graus">
+        <option value="0">0 Graus</option>
+        <option value="1">1 Grau</option>
+        <option value="2">2 Graus</option>
+        <option value="3">3 Graus</option>
+        <option value="4">4 Graus</option>
+      </select>
+      <button onclick="cadastrarUsuario()">Criar Conta e Entrar</button>
+      <span class="toggle-link" onclick="alternarForm(false)">Já tem conta? Voltar ao Login</span>
+    </div>
+
+    <!-- PAINEL COMPLETO -->
+    <div id="app-box" style="display: none;">
+      
+      <!-- CARDS DE ESTATÍSTICAS E GRADUAÇÃO -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 id="faixa-info">Faixa: --</h3>
+          <span id="graus-info" style="color: #8d8d99;">0 Graus</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progresso-bar" class="progress-bar-fill"></div>
+        </div>
+        <small id="progresso-texto" style="color: #8d8d99; display: block; margin-top: 5px; font-size: 11px;">Progresso próximo grau: 0%</small>
+
+        <div class="grid-stats" style="margin-top: 15px;">
+          <div class="stat-box">
+            <h4>Treinos</h4>
+            <span id="total-treinos">0</span>
+          </div>
+          <div class="stat-box">
+            <h4>Rolas</h4>
+            <span id="total-rolas">0</span>
+          </div>
+          <div class="stat-box">
+            <h4>Média Mossa</h4>
+            <span id="media-desgaste">0</span>
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="exportarCSV()">📥 Exportar Diário (Excel/CSV)</button>
+        <button class="btn-sair" onclick="sair()">🚪 Sair / Trocar de Conta</button>
+      </div>
+
+      <!-- NOVO REGISTRO DE TREINO -->
+      <div class="card">
+        <h3>Registrar Treino</h3>
+        <input type="text" id="posicoes" placeholder="Posições aprendidas (ex: Passagem emborcando)">
+        <input type="number" id="rolas" placeholder="Qtd de Rolas/Sparring" value="4">
+        <input type="number" id="desgaste" placeholder="Desgaste/Cansaço (1 a 5)" value="3">
+        <textarea id="anotacoes" placeholder="Observações, detalhes e dores"></textarea>
+        <button onclick="salvarTreino()">Salvar no Diário</button>
+      </div>
+
+      <!-- HISTÓRICO -->
+      <div class="card">
+        <h3>Histórico de Treinos</h3>
+        <input type="text" id="busca" placeholder="🔍 Buscar posição..." onkeyup="carregarTreinos()">
+        <div id="lista-treinos"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let token = localStorage.getItem('tatameone_token') || '';
+
+    window.onload = () => {
+      if (token) {
+        exibirPainel();
+      }
+    };
+
+    function toggleSenha(idCampo, btn) {
+      const campo = document.getElementById(idCampo);
+      if (campo.type === "password") {
+        campo.type = "text";
+        btn.innerText = "🙈";
+      } else {
+        campo.type = "password";
+        btn.innerText = "👁️";
+      }
+    }
+
+    function alternarForm(mostrarCadastro) {
+      document.getElementById('login-box').style.display = mostrarCadastro ? 'none' : 'block';
+      document.getElementById('cadastro-box').style.display = mostrarCadastro ? 'block' : 'none';
+    }
+
+    function exibirPainel() {
+      document.getElementById('login-box').style.display = 'none';
+      document.getElementById('cadastro-box').style.display = 'none';
+      document.getElementById('app-box').style.display = 'block';
+      carregarDashboard();
+      carregarTreinos();
+    }
+
+    async function fazerLogin() {
+      const email = document.getElementById('login-email').value;
+      const senha = document.getElementById('login-senha').value;
+
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        token = data.token;
+        localStorage.setItem('tatameone_token', token);
+        exibirPainel();
+      } else {
+        alert(data.error);
+      }
+    }
+
+    async function cadastrarUsuario() {
+      const nome = document.getElementById('cad-nome').value;
+      const email = document.getElementById('cad-email').value;
+      const senha = document.getElementById('cad-senha').value;
+      const faixa = document.getElementById('cad-faixa').value;
+      const graus = Number(document.getElementById('cad-graus').value);
+
+      if (!nome || !email || !senha) {
+        alert('Preencha Nome, E-mail e Senha.');
+        return;
+      }
+
+      const res = await fetch('/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, email, senha, faixa, graus })
+      });
+
+      if (res.ok) {
+        document.getElementById('login-email').value = email;
+        document.getElementById('login-senha').value = senha;
+        await fazerLogin();
+      } else {
+        const data = await res.json();
+        alert(data.error);
+      }
+    }
+
+    function sair() {
+      localStorage.removeItem('tatameone_token');
+      location.reload();
+    }
+
+    async function carregarDashboard() {
+      const res = await fetch('/dashboard', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        sair();
+        return;
+      }
+
+      const stats = await res.json();
+      document.getElementById('faixa-info').innerText = `Faixa: ${stats.faixa}`;
+      document.getElementById('graus-info').innerText = `${stats.graus} Grau(s)`;
+      document.getElementById('total-treinos').innerText = stats.totalTreinos;
+      document.getElementById('total-rolas').innerText = stats.totalRolas;
+      document.getElementById('media-desgaste').innerText = stats.mediaDesgaste;
+      document.getElementById('progresso-bar').style.width = stats.progressoGrau;
+      document.getElementById('progresso-texto').innerText = `Progresso próximo grau: ${stats.progressoGrau}`;
+    }
+
+    async function carregarTreinos() {
+      const busca = document.getElementById('busca').value;
+      const res = await fetch(`/diario?busca=${encodeURIComponent(busca)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const treinos = await res.json();
+
+      const lista = document.getElementById('lista-treinos');
+      lista.innerHTML = treinos.map(t => `
+        <div class="treino-item">
+          <small>${t.dataTreino}</small>
+          <strong>${t.posicoesAprendidas}</strong>
+          <p style="font-size: 13px; margin-top: 4px;">🔥 Rolas: ${t.qtdRolas} | Cansaço: ${t.nivelDesgaste}/5</p>
+          ${t.anotacoes ? `<p style="font-size: 12px; color: #8d8d99; margin-top: 2px;">📝 ${t.anotacoes}</p>` : ''}
+          <button class="btn-del" onclick="deletarTreino('${t.id}')">Excluir</button>
+        </div>
+      `).join('');
+    }
+
+    async function salvarTreino() {
+      const posicoesAprendidas = document.getElementById('posicoes').value;
+      const qtdRolas = document.getElementById('rolas').value;
+      const nivelDesgaste = document.getElementById('desgaste').value;
+      const anotacoes = document.getElementById('anotacoes').value;
+
+      if (!posicoesAprendidas) {
+        alert('Informe as posições aprendidas.');
+        return;
+      }
+
+      await fetch('/diario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ posicoesAprendidas, qtdRolas, nivelDesgaste, anotacoes })
+      });
+
+      document.getElementById('posicoes').value = '';
+      document.getElementById('anotacoes').value = '';
+      carregarDashboard();
+      carregarTreinos();
+    }
+
+    async function deletarTreino(id) {
+      if (!confirm('Excluir este treino do diário?')) return;
+      await fetch(`/diario/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      carregarDashboard();
+      carregarTreinos();
+    }
+
+    function exportarCSV() {
+      window.open(`/diario/exportar/csv?token=${token}`, '_blank');
+    }
+  </script>
+</body>
+</html>
+   
