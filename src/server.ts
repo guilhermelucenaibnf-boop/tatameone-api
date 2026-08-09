@@ -216,8 +216,10 @@ app.delete('/diario/:id', autenticarToken, (req: AuthRequest, res) => {
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`🥋 TatameOne API Master rodando em http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3000;
+
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`🥋 TatameOne API Master rodando na porta ${PORT}`);
 });
 
+  
