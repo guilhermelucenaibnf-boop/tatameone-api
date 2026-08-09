@@ -312,3 +312,111 @@
 </body>
 </html>
    
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TatameOne</title>
+  <style>
+    :root {
+      --bg: #121214;
+      --card-bg: #202024;
+      --primary: #8257e5;
+      --text: #e1e1e6;
+      --subtext: #a8a8b3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; max-width: 600px; margin: 0 auto; }
+    h1 { color: var(--primary); text-align: center; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; color: var(--subtext); font-size: 0.9rem; }
+    input, select, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 6px; border: none; background: #121214; color: #fff; font-size: 1rem; }
+    button { background: var(--primary); font-weight: bold; cursor: pointer; margin-top: 8px; }
+    button:active { opacity: 0.8; }
+    .item { border-bottom: 1px solid #29292e; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+    .item:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+  <h1>🥋 TatameOne</h1>
+
+  <!-- Formulário de Cadastro -->
+  <div class="card">
+    <h3>Novo Registro</h3>
+    <form id="appForm">
+      <label for="titulo">Descrição / Título</label>
+      <input type="text" id="titulo" placeholder="Ex: Treino de Passagem de Guarda" required>
+
+      <label for="tipo">Categoria</label>
+      <select id="tipo">
+        <option value="Treino">Treino</option>
+        <option value="Técnica">Técnica</option>
+        <option value="Graduação">Graduação</option>
+      </select>
+
+      <button type="submit">Salvar no TatameOne</button>
+    </form>
+  </div>
+
+  <!-- Registros Salvos -->
+  <div class="card">
+    <h3>Registros Salvos</h3>
+    <div id="listaData">Carregando dados...</div>
+  </div>
+
+  <script>
+    const API_URL = 'https://tatameone-api.onrender.com';
+
+    // Buscar dados na API
+    async function fetchData() {
+      const container = document.getElementById('listaData');
+      try {
+        const response = await fetch(`${API_URL}/treinos`); // Altere '/treinos' se sua rota de listagem for diferente
+        const data = await response.json();
+        
+        if (!Array.isArray(data) || data.length === 0) {
+          container.innerHTML = '<p style="color: var(--subtext)">Nenhum registro encontrado.</p>';
+          return;
+        }
+
+        container.innerHTML = data.map(item => `
+          <div class="item">
+            <div>
+              <strong>${item.titulo || item.nome || 'Registro'}</strong><br>
+              <small style="color: var(--subtext)">${item.tipo || 'Geral'}</small>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<p style="color: #f75a68">Erro ao carregar dados da API.</p>';
+      }
+    }
+
+    // Enviar dados para a API
+    document.getElementById('appForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const titulo = document.getElementById('titulo').value;
+      const tipo = document.getElementById('tipo').value;
+
+      try {
+        await fetch(`${API_URL}/treinos`, { // Altere '/treinos' se sua rota POST for diferente
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titulo, tipo })
+        });
+
+        document.getElementById('titulo').value = '';
+        fetchData();
+      } catch (err) {
+        alert('Erro ao salvar!');
+      }
+    });
+
+    // Carregar ao abrir
+    fetchData();
+  </script>
+</body>
+</html>
+
