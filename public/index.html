@@ -3,231 +3,240 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TatameOne</title>
+  <title>TatameOne - Gestão de Artes Marciais</title>
   <style>
     body { background-color: #121214; color: #ffffff; font-family: sans-serif; margin: 0; padding: 15px; }
     .header { text-align: center; margin-bottom: 20px; }
-    .header h1 { margin: 0; color: #ff334b; }
+    .header h1 { margin: 0; color: #00b37e; }
     .header p { color: #8d8d99; font-size: 0.9rem; margin-top: 5px; }
-    .tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; position: relative; z-index: 10; }
-    .tab-btn { background-color: #202024; border: 1px solid #323238; color: #c4c4cc; padding: 12px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; max-width: 130px; text-align: center; font-size: 0.85rem; }
-    .tab-btn.active { background-color: #ff334b; color: #ffffff; border-color: #ff334b; }
+    .tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; overflow-x: auto; }
+    .tab-btn { background-color: #202024; border: 1px solid #323238; color: #c4c4cc; padding: 8px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; white-space: nowrap; }
+    .tab-btn.active { background-color: #00b37e; color: #ffffff; border-color: #00b37e; }
     .tab-content { display: none; background: #202024; padding: 16px; border-radius: 8px; border: 1px solid #323238; }
     .tab-content.active { display: block !important; }
     label { display: block; margin-top: 10px; font-size: 0.85rem; color: #a8a8b3; }
-    input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
-    button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
-    .btn-print { background: #00b37e; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 10px; cursor: pointer; }
-    
-    /* ESTILO LISTA E COMPROVANTE */
-    .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; text-align: center; }
-    .receipt-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff334b; margin-bottom: 10px; }
-    .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; }
-
-    .aluno-card { background: #121214; border: 1px solid #323238; padding: 12px; border-radius: 6px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }
-    .aluno-info { display: flex; align-items: center; gap: 10px; }
-    .aluno-info img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #ff334b; }
-    .btn-delete-item { background: #e52e4d; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
-
-    /* IMPRESSÃO */
-    @media print {
-      body * { visibility: hidden; }
-      #areaComprovante, #areaComprovante * { visibility: visible; }
-      #areaComprovante { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
-      .receipt-card { border: 1px solid #000; background: #fff; color: #000; }
-      .receipt-card h4 { color: #000; }
-      .btn-print { display: none; }
-    }
+    input, select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
+    input[type="text"] { text-transform: uppercase; font-weight: bold; }
+    button.btn-main { background: #00b37e; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; font-size: 1rem; color: #fff; }
+    .card-stat { background: #121214; border: 1px solid #323238; padding: 15px; border-radius: 6px; margin-top: 10px; text-align: center; }
+    .card-stat h3 { margin: 0; color: #00b37e; font-size: 1.8rem; }
+    .card-stat p { margin: 5px 0 0 0; color: #8d8d99; font-size: 0.85rem; }
+    .aluno-card { background: #121214; border: 1px solid #323238; padding: 12px; border-radius: 6px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .btn-delete { background: #e52e4d; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; margin: 0; }
   </style>
 </head>
 <body>
 
   <div class="header">
     <h1>🥋 TatameOne</h1>
-    <p>"Suor no treino, honra no tatame. OSS!"</p>
+    <p>Gestão de Academias & Lutas</p>
   </div>
 
   <div class="tabs">
-    <button type="button" class="tab-btn active" data-tab="perfil">Perfil / Dojô</button>
-    <button type="button" class="tab-btn" data-tab="pagamentos">Alunos & Caixa</button>
-    <button type="button" class="tab-btn" data-tab="stats">📊 Estatísticas</button>
+    <button type="button" class="tab-btn active" onclick="abrirAba('alunos')">👥 Alunos</button>
+    <button type="button" class="tab-btn" onclick="abrirAba('caixa')">💰 Caixa</button>
+    <button type="button" class="tab-btn" onclick="abrirAba('estatisticas')">📊 Estatísticas</button>
   </div>
 
-  <!-- ABA PERFIL -->
-  <div id="tab-perfil" class="tab-content active">
-    <h3>📜 Dados do Dojô / Proprietário</h3>
-    <label>Nome da Academia / Dojô</label>
-    <input type="text" id="nomeDojo" placeholder="Ex: Academia Team TatameOne">
+  <!-- ABA ALUNOS -->
+  <div id="tab-alunos" class="tab-content active">
+    <h3>📝 Cadastro de Aluno</h3>
+    <label>Nome Completo</label>
+    <input type="text" id="nomeAluno" placeholder="Ex: João Silva">
     
-    <label>CNPJ / CPF do Dojô</label>
-    <input type="text" id="cnpjDojo" placeholder="00.000.000/0001-00">
-    
-    <label>Endereço Completo</label>
-    <input type="text" id="enderecoDojo" placeholder="Rua, Número, Bairro, Cidade">
+    <label>Graduação / Faixa</label>
+    <select id="faixaAluno">
+      <option value="Branca">Faixa Branca</option>
+      <option value="Azul">Faixa Azul</option>
+      <option value="Roxa">Faixa Roxa</option>
+      <option value="Marrom">Faixa Marrom</option>
+      <option value="Preta">Faixa Preta</option>
+    </select>
 
-    <button type="button" class="form-btn" onclick="alert('Dados salvos!')">Gravar Dados do Dojô</button>
+    <label>Categoria (Idade)</label>
+    <select id="categoriaAluno">
+      <option value="Infantil">Infantil</option>
+      <option value="Juvenil">Juvenil</option>
+      <option value="Adulto">Adulto</option>
+      <option value="Master">Master</option>
+    </select>
+
+    <button type="button" class="btn-main" onclick="cadastrarAluno()">Cadastrar Aluno</button>
+
+    <hr style="border: 0.5px solid #323238; margin: 20px 0;">
+
+    <h3>📋 Lista de Alunos</h3>
+    <div id="listaAlunos">
+      <p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado.</p>
+    </div>
   </div>
 
-  <!-- ABA ALUNOS & CAIXA -->
-  <div id="tab-pagamentos" class="tab-content">
-    <h3>🥋 Cadastrar Aluno</h3>
-    <form id="formAluno">
-      <label>Foto do Aluno</label>
-      <input type="file" id="fotoInput" accept="image/*">
-      
-      <label>Nome do Aluno</label>
-      <input type="text" id="nomeAluno" placeholder="Ex: João Silva" required>
-      
-      <label>Faixa Etária</label>
-      <select id="idadeAluno">
-        <option value="Infantil">Infantil</option>
-        <option value="Juvenil">Juvenil</option>
-        <option value="Adulto">Adulto</option>
-        <option value="Master">Master</option>
-      </select>
+  <!-- ABA CAIXA -->
+  <div id="tab-caixa" class="tab-content">
+    <h3>💵 Lançamento de Caixa</h3>
+    <label>Descrição (Ex: Mensalidade)</label>
+    <input type="text" id="descCaixa" placeholder="Mensalidade - João">
 
-      <label>Graduação</label>
-      <select id="faixaAluno">
-        <option value="Branca">Branca</option>
-        <option value="Azul">Azul</option>
-        <option value="Roxa">Roxa</option>
-        <option value="Marrom">Marrom</option>
-        <option value="Preta">Preta</option>
-      </select>
+    <label>Valor (R$)</label>
+    <input type="number" id="valorCaixa" placeholder="150.00" step="0.50">
 
-      <label>Valor (R$)</label>
-      <input type="number" id="valorPagamento" placeholder="150,00" required>
+    <button type="button" class="btn-main" onclick="lancarCaixa()">Registrar Entrada no Caixa</button>
 
-      <button type="button" class="form-btn" onclick="registrarPagamento()">Cadastrar Aluno & Comprovante</button>
-    </form>
+    <hr style="border: 0.5px solid #323238; margin: 20px 0;">
+    <h3>📜 Histórico de Caixa</h3>
+    <div id="listaCaixa">
+      <p style="color: #8d8d99; font-size: 0.85rem;">Nenhum lançamento no caixa.</p>
+    </div>
+  </div>
 
-    <div id="areaComprovante" style="display: none;">
-      <div class="receipt-card">
-        <img id="compFoto" src="" alt="Foto">
-        <h4>🧾 COMPROVANTE DE PAGAMENTO</h4>
-        <p><strong>Dojô:</strong> <span id="compDojo">TatameOne</span></p>
-        <p><strong>CNPJ/CPF:</strong> <span id="compCnpj">-</span></p>
-        <p><strong>Endereço:</strong> <span id="compEndereco">-</span></p>
-        <hr style="border: 0.5px dashed #ff334b; margin: 10px 0;">
-        <p><strong>Aluno:</strong> <span id="compAluno">-</span></p>
-        <p><strong>Idade:</strong> <span id="compIdade">-</span></p>
-        <p><strong>Graduação:</strong> <span id="compFaixa">-</span></p>
-        <p><strong>Valor:</strong> R$ <span id="compValor">0,00</span></p>
-        
-        <button type="button" class="btn-print" onclick="window.print()">🖨️ Imprimir (Bluetooth / Wi-Fi)</button>
+  <!-- ABA ESTATÍSTICAS -->
+  <div id="tab-estatisticas" class="tab-content">
+    <h3>📊 Painel de Estatísticas</h3>
+    
+    <div class="card-stat">
+      <h3 id="statTotalAlunos">0</h3>
+      <p>Total de Alunos Matriculados</p>
+    </div>
+
+    <div class="card-stat">
+      <h3 id="statTotalCaixa" style="color: #fba94c;">R$ 0,00</h3>
+      <p>Arrecadação Total do Caixa</p>
+    </div>
+
+    <div class="card-stat" style="text-align: left; padding: 15px;">
+      <p style="color: #00b37e; font-weight: bold; margin-bottom: 8px;">🥋 Graduações no Tatame:</p>
+      <div id="statFaixas" style="font-size: 0.85rem; color: #c4c4cc; line-height: 1.6;">
+        Nenhum dado registrado ainda.
       </div>
     </div>
-
-    <!-- LISTA DE ALUNOS COM EXCLUSÃO -->
-    <hr style="border: 0.5px solid #323238; margin: 20px 0;">
-    <h3>📋 Alunos Cadastrados / Gestão de Exclusão</h3>
-    <div id="listaAlunos">
-      <p style="color: #8d8d99; font-size: 0.85rem;" id="semAlunos">Nenhum aluno cadastrado no momento.</p>
-    </div>
-  </div>
-
-  <div id="tab-stats" class="tab-content">
-    <h3>📊 Painel do Tatame</h3>
   </div>
 
   <script>
     let alunos = [];
+    let caixa = [];
 
-    document.addEventListener('DOMContentLoaded', function() {
-      const buttons = document.querySelectorAll('.tab-btn');
-      const contents = document.querySelectorAll('.tab-content');
-      buttons.forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.preventDefault();
-          const targetTab = this.getAttribute('data-tab');
-          buttons.forEach(b => b.classList.remove('active'));
-          contents.forEach(c => c.classList.remove('active'));
-          this.classList.add('active');
-          document.getElementById('tab-' + targetTab).classList.add('active');
-        });
-      });
-    });
+    function abrirAba(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabName).classList.add('active');
 
-    function registrarPagamento() {
-      const dojo = document.getElementById('nomeDojo').value || 'TatameOne';
-      const cnpj = document.getElementById('cnpjDojo').value || 'Não informado';
-      const endereco = document.getElementById('enderecoDojo').value || 'Não informado';
+      if (tabName === 'estatisticas') {
+        atualizarEstatisticas();
+      }
+    }
 
-      const nome = document.getElementById('nomeAluno').value;
-      const idade = document.getElementById('idadeAluno').value;
+    function cadastrarAluno() {
+      const nome = document.getElementById('nomeAluno').value.toUpperCase().trim();
       const faixa = document.getElementById('faixaAluno').value;
-      const valor = document.getElementById('valorPagamento').value;
-      const fotoInput = document.getElementById('fotoInput');
+      const categoria = document.getElementById('categoriaAluno').value;
 
-      if (!nome || !valor) {
-        alert('Preencha o nome e o valor!');
+      if (!nome) {
+        alert('Digite o nome do aluno!');
         return;
       }
 
-      document.getElementById('compDojo').innerText = dojo;
-      document.getElementById('compCnpj').innerText = cnpj;
-      document.getElementById('compEndereco').innerText = endereco;
-
-      document.getElementById('compAluno').innerText = nome;
-      document.getElementById('compIdade').innerText = idade;
-      document.getElementById('compFaixa').innerText = faixa;
-      document.getElementById('compValor').innerText = parseFloat(valor || 0).toFixed(2);
-
-      let fotoUrl = '';
-      if (fotoInput.files && fotoInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          fotoUrl = e.target.result;
-          document.getElementById('compFoto').src = fotoUrl;
-          adicionarAlunoLista(nome, faixa, idade, fotoUrl);
-        }
-        reader.readAsDataURL(fotoInput.files[0]);
-      } else {
-        document.getElementById('compFoto').src = '';
-        adicionarAlunoLista(nome, faixa, idade, '');
-      }
-      
-      document.getElementById('areaComprovante').style.display = 'block';
+      alunos.push({ id: Date.now(), nome, faixa, categoria });
+      document.getElementById('nomeAluno').value = '';
+      renderizarAlunos();
+      alert('Aluno cadastrado com sucesso!');
     }
 
-    function adicionarAlunoLista(nome, faixa, idade, foto) {
-      const id = Date.now();
-      alunos.push({ id, nome, faixa, idade, foto });
-      renderizarLista();
-      document.getElementById('formAluno').reset();
-    }
-
-    function removerAluno(id) {
-      if (confirm('Deseja realmente excluir este aluno do sistema?')) {
+    function excluirAluno(id) {
+      if (confirm('Deseja realmente excluir este aluno?')) {
         alunos = alunos.filter(a => a.id !== id);
-        renderizarLista();
+        renderizarAlunos();
       }
     }
 
-    function renderizarLista() {
+    function renderizarAlunos() {
       const container = document.getElementById('listaAlunos');
       if (alunos.length === 0) {
-        container.innerHTML = '<p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado no momento.</p>';
+        container.innerHTML = '<p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado.</p>';
         return;
       }
 
       container.innerHTML = '';
-      alunos.forEach(aluno => {
-        const imgTag = aluno.foto ? `<img src="${aluno.foto}" alt="Foto">` : `<div style="width:45px;height:45px;border-radius:50%;background:#323238;display:flex;align-items:center;justify-content:center;">🥋</div>`;
-        
+      alunos.forEach(a => {
         container.innerHTML += `
           <div class="aluno-card">
-            <div class="aluno-info">
-              ${imgTag}
-              <div>
-                <strong>${aluno.nome}</strong><br>
-                <small style="color:#a8a8b3">${aluno.faixa} - ${aluno.idade}</small>
-              </div>
+            <div>
+              <strong style="color: #00b37e;">${a.nome}</strong><br>
+              <small style="color: #a8a8b3">Faixa: ${a.faixa} | Cat: ${a.categoria}</small>
             </div>
-            <button class="btn-delete-item" onclick="removerAluno(${aluno.id})">🗑️ Excluir</button>
+            <button class="btn-delete" onclick="excluirAluno(${a.id})">🗑️ Excluir</button>
           </div>
         `;
       });
+    }
+
+    function lancarCaixa() {
+      const desc = document.getElementById('descCaixa').value.trim();
+      const valor = parseFloat(document.getElementById('valorCaixa').value);
+
+      if (!desc || isNaN(valor)) {
+        alert('Preencha a descrição e o valor corretamente!');
+        return;
+      }
+
+      caixa.push({ id: Date.now(), desc, valor });
+      document.getElementById('descCaixa').value = '';
+      document.getElementById('valorCaixa').value = '';
+      renderizarCaixa();
+      alert('Lançamento efetuado com sucesso!');
+    }
+
+    function renderizarCaixa() {
+      const container = document.getElementById('listaCaixa');
+      if (caixa.length === 0) {
+        container.innerHTML = '<p style="color: #8d8d99; font-size: 0.85rem;">Nenhum lançamento no caixa.</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      caixa.forEach(c => {
+        container.innerHTML += `
+          <div class="aluno-card">
+            <div>
+              <strong>${c.desc}</strong><br>
+              <small style="color: #00b37e; font-weight: bold;">+ R$ ${c.valor.toFixed(2)}</small>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function atualizarEstatisticas() {
+      // Total de Alunos
+      document.getElementById('statTotalAlunos').innerText = alunos.length;
+
+      // Total de Caixa
+      const totalCaixa = caixa.reduce((acc, item) => acc + item.valor, 0);
+      document.getElementById('statTotalCaixa').innerText = `R$ ${totalCaixa.toFixed(2)}`;
+
+      // Contagem por Faixas
+      const contagemFaixas = {};
+      alunos.forEach(a => {
+        contagemFaixas[a.faixa] = (contagemFaixas[a.faixa] || 0) + 1;
+      });
+
+      const faixasContainer = document.getElementById('statFaixas');
+      if (Object.keys(contagemFaixas).length === 0) {
+        faixasContainer.innerHTML = 'Nenhum aluno cadastrado no momento.';
+        return;
+      }
+
+      faixasContainer.innerHTML = '';
+      for (const [faixa, qtd] in Object.entries(contagemFaixas)) {
+        // Correção de exibição do loop
+      }
+      
+      let htmlFaixas = '';
+      for (let faixa in contagemFaixas) {
+        htmlFaixas += `• Faixa ${faixa}: <strong>${contagemFaixas[faixa]} aluno(s)</strong><br>`;
+      }
+      faixasContainer.innerHTML = htmlFaixas;
     }
   </script>
 </body>
