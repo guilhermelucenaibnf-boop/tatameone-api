@@ -18,20 +18,21 @@
     input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
     button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
     .btn-print { background: #00b37e; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 10px; cursor: pointer; }
+    .btn-delete { background: #e52e4d; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 8px; cursor: pointer; }
     
     /* ESTILO DO COMPROVANTE */
     .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; text-align: center; }
     .receipt-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff334b; margin-bottom: 10px; }
     .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; }
 
-    /* REGRAS EXCLUSIVAS PARA IMPRESSÃO (Wi-Fi / Bluetooth) */
+    /* REGRAS EXCLUSIVAS PARA IMPRESSÃO */
     @media print {
       body * { visibility: hidden; }
       #areaComprovante, #areaComprovante * { visibility: visible; }
       #areaComprovante { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
       .receipt-card { border: 1px solid #000; background: #fff; color: #000; }
       .receipt-card h4 { color: #000; }
-      .btn-print { display: none; }
+      .btn-print, .btn-delete { display: none; }
     }
   </style>
 </head>
@@ -110,6 +111,7 @@
         <p><strong>Valor:</strong> R$ <span id="compValor">0,00</span></p>
         
         <button type="button" class="btn-print" onclick="window.print()">🖨️ Imprimir (Bluetooth / Wi-Fi)</button>
+        <button type="button" class="btn-delete" onclick="excluirAluno()">🗑️ Excluir Aluno</button>
       </div>
     </div>
   </div>
@@ -149,6 +151,11 @@
       const valor = document.getElementById('valorPagamento').value;
       const fotoInput = document.getElementById('fotoInput');
 
+      if (!nome || !valor) {
+        alert('Preencha o nome e o valor!');
+        return;
+      }
+
       document.getElementById('compDojo').innerText = dojo;
       document.getElementById('compCnpj').innerText = cnpj;
       document.getElementById('compEndereco').innerText = endereco;
@@ -164,9 +171,20 @@
           document.getElementById('compFoto').src = e.target.result;
         }
         reader.readAsDataURL(fotoInput.files[0]);
+      } else {
+        document.getElementById('compFoto').src = '';
       }
       
       document.getElementById('areaComprovante').style.display = 'block';
+    }
+
+    function excluirAluno() {
+      if (confirm("Tem certeza que deseja excluir este aluno e limpar a tela?")) {
+        document.getElementById('formAluno').reset();
+        document.getElementById('areaComprovante').style.display = 'none';
+        document.getElementById('compFoto').src = '';
+        alert("Aluno excluído com sucesso!");
+      }
     }
   </script>
 </body>
