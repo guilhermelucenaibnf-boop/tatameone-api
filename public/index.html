@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TatameOne</title>
+  <title>TatameOne - OSS!</title>
   <link rel="manifest" href="/manifest.json">
   <style>
     :root {
@@ -13,11 +13,15 @@
       --text: #e1e1e6;
       --subtext: #a8a8b3;
       --success: #04d361;
+      --pix: #32bcad;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
-    h1 { color: var(--primary); text-align: center; margin-bottom: 16px; }
     
+    .header { text-align: center; margin-bottom: 16px; }
+    .header h1 { color: var(--primary); font-size: 1.8rem; }
+    .header p { color: var(--subtext); font-size: 0.9rem; font-style: italic; }
+
     /* Menu de Abas */
     .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
     .tab-btn { flex: 1; padding: 10px; background: var(--card-bg); border: 1px solid #29292e; color: var(--subtext); border-radius: 6px; cursor: pointer; font-weight: bold; text-align: center; }
@@ -27,120 +31,187 @@
     .tab-content.active { display: block; }
 
     .card { background: var(--card-bg); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    h3 { margin-bottom: 12px; color: #fff; }
+    h3 { margin-bottom: 12px; color: #fff; display: flex; align-items: center; gap: 8px; }
     label { display: block; margin-bottom: 6px; color: var(--subtext); font-size: 0.85rem; }
     input, select, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 6px; border: none; background: #121214; color: #fff; font-size: 0.95rem; }
+    
     button { background: var(--primary); font-weight: bold; cursor: pointer; margin-top: 8px; }
     button:active { opacity: 0.8; }
-    
-    .item { border-bottom: 1px solid #29292e; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
-    .item:last-child { border-bottom: none; }
+    .btn-pix { background: var(--pix); color: #121214; }
+    .btn-print { background: #29292e; color: var(--text); border: 1px solid #323238; }
+
+    .item { border-bottom: 1px solid #29292e; padding: 12px 0; }
+    .item-header { display: flex; justify-content: space-between; align-items: center; }
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
     .badge-pago { background: #0e3a2f; color: var(--success); }
     .badge-pendente { background: #4a2810; color: #ff9900; }
+
+    /* Área de Recibo Oculta para Impressão */
+    @media print {
+      body * { visibility: hidden; }
+      #printableReceipt, #printableReceipt * { visibility: visible; }
+      #printableReceipt { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; padding: 10px; font-family: monospace; }
+    }
   </style>
 </head>
 <body>
 
-  <h1>🥋 TatameOne</h1>
+  <div class="header">
+    <h1>🥋 TatameOne</h1>
+    <p>"Suor no treino, honra no tatame. OSS!"</p>
+  </div>
 
   <!-- Navegação por Abas -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('perfil')">Perfil / Academia</button>
-    <button class="tab-btn" onclick="switchTab('pagamentos')">Pagamentos</button>
+    <button class="tab-btn active" onclick="switchTab('perfil')">Perfil / Dojô</button>
+    <button class="tab-btn" onclick="switchTab('pagamentos')">Caixa & Mensalidades</button>
   </div>
 
-  <!-- ABA PERFIL / ACADEMIA -->
+  <!-- ABA PERFIL / DOJÔ -->
   <div id="tab-perfil" class="tab-content active">
     <div class="card">
-      <h3>Dados do Perfil</h3>
+      <h3>📜 Dados do Dojô / Professor</h3>
       <form id="formPerfil">
-        <label>Tipo de Cadastro</label>
+        <label>Tipo de Registro</label>
         <select id="tipoPessoa" onchange="toggleTipoPessoa()">
           <option value="PJ">Pessoa Jurídica (Academia / CNPJ)</option>
-          <option value="PF">Pessoa Física (Instrutor / CPF)</option>
+          <option value="PF">Pessoa Física (Professor / CPF)</option>
         </select>
 
-        <label id="lblNome">Nome da Academia</label>
-        <input type="text" id="nomePerfil" placeholder="Ex: Gracie Barra Central" required>
+        <label id="lblNome">Nome da Academia / Dojô</label>
+        <input type="text" id="nomePerfil" placeholder="Ex: Academia Team TatameOne" required>
 
         <label id="lblDoc">CNPJ</label>
         <input type="text" id="docPerfil" placeholder="00.000.000/0001-00" required>
 
-        <label>Endereço Completo</label>
+        <label>Chave PIX (para recebimentos)</label>
+        <input type="text" id="chavePix" placeholder="CPF, CNPJ, E-mail ou Celular">
+
+        <label>Endereço do Tatame</label>
         <input type="text" id="enderecoPerfil" placeholder="Rua, Número, Bairro, Cidade" required>
 
-        <button type="submit">Salvar Perfil</button>
+        <button type="submit">Gravar Dados no Tatame</button>
       </form>
     </div>
   </div>
 
-  <!-- ABA PAGAMENTOS -->
+  <!-- ABA PAGAMENTOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
     <div class="card">
-      <h3>Novo Pagamento</h3>
+      <h3>💳 Registrar Mensalidade / Cobrança</h3>
       <form id="formPagamento">
-        <label>Nome do Aluno</label>
-        <input type="text" id="pagAluno" placeholder="Ex: João Silva" required>
+        <label>Nome do Aluno (Guerreiro)</label>
+        <input type="text" id="pagAluno" placeholder="Ex: Casca Grossa Silva" required>
 
         <label>Valor (R$)</label>
         <input type="number" step="0.01" id="pagValor" placeholder="150.00" required>
 
-        <label>Status</label>
-        <select id="pagStatus">
-          <option value="Pago">Pago</option>
-          <option value="Pendente">Pendente</option>
+        <label>Forma de Pagamento</label>
+        <select id="pagMetodo">
+          <option value="PIX">⚡ PIX (QR Code / Copia e Cola)</option>
+          <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
+          <option value="Cartão de Débito">💳 Cartão de Débito / NFC</option>
+          <option value="Dinheiro">💵 Dinheiro em Espécie</option>
         </select>
 
-        <button type="submit">Registrar Pagamento</button>
+        <label>Status da Mensalidade</label>
+        <select id="pagStatus">
+          <option value="Pago">Pago (PAGO - OSS!)</option>
+          <option value="Pendente">Pendente (Em Aberto)</option>
+        </select>
+
+        <button type="submit">Salvar Pagamento</button>
       </form>
     </div>
 
+    <!-- Registros Salvos -->
     <div class="card">
-      <h3>Histórico de Pagamentos</h3>
-      <div id="listaPagamentos">Carregando...</div>
+      <h3>🥋 Histórico do Caixa</h3>
+      <div id="listaPagamentos">Carregando dados...</div>
     </div>
   </div>
 
   <script>
     const API_URL = 'https://tatameone-api.onrender.com';
 
-    // Troca entre PJ e PF nos campos do formulário
     function toggleTipoPessoa() {
       const tipo = document.getElementById('tipoPessoa').value;
-      const lblNome = document.getElementById('lblNome');
-      const lblDoc = document.getElementById('lblDoc');
-      const docInput = document.getElementById('docPerfil');
-
-      if (tipo === 'PF') {
-        lblNome.innerText = 'Nome Completo do Responsável / Instrutor';
-        lblDoc.innerText = 'CPF';
-        docInput.placeholder = '000.000.000-00';
-      } else {
-        lblNome.innerText = 'Nome da Academia';
-        lblDoc.innerText = 'CNPJ';
-        docInput.placeholder = '00.000.000/0001-00';
-      }
+      document.getElementById('lblNome').innerText = tipo === 'PF' ? 'Nome do Mestre / Professor' : 'Nome da Academia / Dojô';
+      document.getElementById('lblDoc').innerText = tipo === 'PF' ? 'CPF' : 'CNPJ';
     }
 
-    // Troca de Abas
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
       event.target.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
 
       if (tab === 'pagamentos') fetchPagamentos();
     }
 
-    // --- PERFIL (PF / PJ) ---
+    // IMPRESSÃO DE RECIBO (Wi-Fi / Bluetooth via Sistema)
+    function imprimirRecibo(aluno, valor, metodo, data) {
+      const reciboWindow = window.open('', '', 'width=300,height=400');
+      reciboWindow.document.write(`
+        <div style="font-family: monospace; font-size: 12px; text-align: center;">
+          <h2>🥋 TATAMEONE 🥋</h2>
+          <p>--------------------------------</p>
+          <p><strong>COMPROVANTE DE PAGAMENTO</strong></p>
+          <p>--------------------------------</p>
+          <p style="text-align: left;"><strong>Aluno:</strong> ${aluno}</p>
+          <p style="text-align: left;"><strong>Valor:</strong> R$ ${valor}</p>
+          <p style="text-align: left;"><strong>Método:</strong> ${metodo}</p>
+          <p style="text-align: left;"><strong>Data:</strong> ${data}</p>
+          <p>--------------------------------</p>
+          <p>Mantenha o treino em dia!</p>
+          <p><strong>OSS!</strong></p>
+        </div>
+      `);
+      reciboWindow.document.close();
+      reciboWindow.focus();
+      reciboWindow.print();
+      reciboWindow.close();
+    }
+
+    // BUSCAR PAGAMENTOS
+    async function fetchPagamentos() {
+      const container = document.getElementById('listaPagamentos');
+      try {
+        const res = await fetch(`${API_URL}/pagamentos`);
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          container.innerHTML = '<p style="color: var(--subtext)">Nenhum registro encontrado no tatame.</p>';
+          return;
+        }
+
+        container.innerHTML = data.map(item => `
+          <div class="item">
+            <div class="item-header">
+              <div>
+                <strong>${item.aluno || item.nome}</strong><br>
+                <small style="color: var(--subtext)">R$ ${item.valor} | ${item.metodo || 'PIX'}</small>
+              </div>
+              <span class="badge ${item.status === 'Pago' ? 'badge-pago' : 'badge-pendente'}">${item.status}</span>
+            </div>
+            <button class="btn-print" onclick="imprimirRecibo('${item.aluno || item.nome}', '${item.valor}', '${item.metodo || 'PIX'}', '${new Date().toLocaleDateString()}')">
+              🖨️ Imprimir Recibo
+            </button>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<p style="color: #f75a68">Erro ao buscar mensalidades do tatame.</p>';
+      }
+    }
+
+    // SALVAR PERFIL
     document.getElementById('formPerfil').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
         tipoPessoa: document.getElementById('tipoPessoa').value,
         nome: document.getElementById('nomePerfil').value,
         documento: document.getElementById('docPerfil').value,
+        chavePix: document.getElementById('chavePix').value,
         endereco: document.getElementById('enderecoPerfil').value
       };
 
@@ -150,43 +221,19 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        alert('Perfil salvo com sucesso!');
+        alert('OSS! Dados do Dojô salvos com sucesso!');
       } catch (err) {
-        alert('Erro ao salvar perfil.');
+        alert('Erro ao registrar dados.');
       }
     });
 
-    // --- PAGAMENTOS ---
-    async function fetchPagamentos() {
-      const container = document.getElementById('listaPagamentos');
-      try {
-        const res = await fetch(`${API_URL}/pagamentos`);
-        const data = await res.json();
-
-        if (!Array.isArray(data) || data.length === 0) {
-          container.innerHTML = '<p style="color: var(--subtext)">Nenhum pagamento registrado.</p>';
-          return;
-        }
-
-        container.innerHTML = data.map(item => `
-          <div class="item">
-            <div>
-              <strong>${item.aluno || item.nome}</strong><br>
-              <small style="color: var(--subtext)">R$ ${item.valor}</small>
-            </div>
-            <span class="badge ${item.status === 'Pago' ? 'badge-pago' : 'badge-pendente'}">${item.status}</span>
-          </div>
-        `).join('');
-      } catch (err) {
-        container.innerHTML = '<p style="color: #f75a68">Erro ao carregar pagamentos.</p>';
-      }
-    }
-
+    // SALVAR PAGAMENTO
     document.getElementById('formPagamento').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
         aluno: document.getElementById('pagAluno').value,
         valor: document.getElementById('pagValor').value,
+        metodo: document.getElementById('pagMetodo').value,
         status: document.getElementById('pagStatus').value
       };
 
@@ -196,11 +243,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        alert('OSS! Mensalidade registrada com sucesso!');
         document.getElementById('pagAluno').value = '';
         document.getElementById('pagValor').value = '';
         fetchPagamentos();
       } catch (err) {
-        alert('Erro ao registrar pagamento.');
+        alert('Erro ao gravar mensalidade.');
       }
     });
   </script>
