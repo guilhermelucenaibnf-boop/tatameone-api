@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -13,7 +14,7 @@
       --text: #e1e1e6;
       --subtext: #a8a8b3;
       --success: #04d361;
-      --pix: #32bcad;
+      --warning: #ff9900;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
@@ -24,7 +25,7 @@
 
     /* Menu de Abas */
     .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tab-btn { flex: 1; padding: 10px; background: var(--card-bg); border: 1px solid #29292e; color: var(--subtext); border-radius: 6px; cursor: pointer; font-weight: bold; text-align: center; }
+    .tab-btn { flex: 1; padding: 10px; background: var(--card-bg); border: 1px solid #29292e; color: var(--subtext); border-radius: 6px; cursor: pointer; font-weight: bold; text-align: center; font-size: 0.85rem; }
     .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
     .tab-content { display: none; }
@@ -37,21 +38,24 @@
     
     button { background: var(--primary); font-weight: bold; cursor: pointer; margin-top: 8px; }
     button:active { opacity: 0.8; }
-    .btn-pix { background: var(--pix); color: #121214; }
-    .btn-print { background: #29292e; color: var(--text); border: 1px solid #323238; }
+    .btn-print { background: #29292e; color: var(--text); border: 1px solid #323238; margin-top: 6px; padding: 6px 10px; font-size: 0.8rem; }
 
-    .item { border-bottom: 1px solid #29292e; padding: 12px 0; }
+    /* Estilos para Foto e Badges */
+    .photo-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; background: #121214; border: 2px solid var(--primary); margin: 8px auto 12px auto; display: block; }
+    .item-avatar { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; background: #121214; border: 1px solid var(--primary); }
+
+    .item { border-bottom: 1px solid #29292e; padding: 12px 0; display: flex; gap: 12px; align-items: center; }
+    .item-info { flex: 1; }
     .item-header { display: flex; justify-content: space-between; align-items: center; }
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    .badge { padding: 3px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
     .badge-pago { background: #0e3a2f; color: var(--success); }
-    .badge-pendente { background: #4a2810; color: #ff9900; }
+    .badge-pendente { background: #4a2810; color: var(--warning); }
+    .badge-faixa { background: #121214; border: 1px solid #323238; color: #fff; }
 
-    /* Área de Recibo Oculta para Impressão */
-    @media print {
-      body * { visibility: hidden; }
-      #printableReceipt, #printableReceipt * { visibility: visible; }
-      #printableReceipt { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; padding: 10px; font-family: monospace; }
-    }
+    /* Painel de Estatísticas */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-box { background: #121214; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #29292e; }
+    .stat-number { font-size: 1.4rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -64,7 +68,8 @@
   <!-- Navegação por Abas -->
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('perfil')">Perfil / Dojô</button>
-    <button class="tab-btn" onclick="switchTab('pagamentos')">Caixa & Mensalidades</button>
+    <button class="tab-btn" onclick="switchTab('pagamentos')">Alunos & Caixa</button>
+    <button class="tab-btn" onclick="switchTab('stats')">📊 Estatísticas</button>
   </div>
 
   <!-- ABA PERFIL / DOJÔ -->
@@ -95,44 +100,101 @@
     </div>
   </div>
 
-  <!-- ABA PAGAMENTOS & CAIXA -->
+  <!-- ABA ALUNOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
     <div class="card">
-      <h3>💳 Registrar Mensalidade / Cobrança</h3>
+      <h3>📸 Cadastrar Aluno & Mensalidade</h3>
       <form id="formPagamento">
+        <label>Foto do Aluno</label>
+        <img id="imgPreview" class="photo-preview" src="https://cdn-icons-png.flaticon.com/512/847/847969.png" alt="Foto">
+        <input type="file" id="pagFoto" accept="image/*" capture="environment" onchange="previewImage(event)">
+
         <label>Nome do Aluno (Guerreiro)</label>
         <input type="text" id="pagAluno" placeholder="Ex: Casca Grossa Silva" required>
 
-        <label>Valor (R$)</label>
+        <label>Faixa Etária</label>
+        <select id="pagFaixaEtaria">
+          <option value="Infantil">Infantil (Até 12 anos)</option>
+          <option value="Juvenil">Juvenil (13 a 17 anos)</option>
+          <option value="Adulto">Adulto (18 a 29 anos)</option>
+          <option value="Master">Master (30+ anos)</option>
+        </select>
+
+        <label>Cor da Faixa</label>
+        <select id="pagFaixa">
+          <option value="Branca">⚪ Branca</option>
+          <option value="Cinza">🔘 Cinza</option>
+          <option value="Amarela">🟡 Amarela</option>
+          <option value="Laranja">🟠 Laranja</option>
+          <option value="Verde">🟢 Verde</option>
+          <option value="Azul">🔵 Azul</option>
+          <option value="Roxa">🟣 Roxa</option>
+          <option value="Marrom">🟤 Marrom</option>
+          <option value="Preta">⚫ Preta</option>
+        </select>
+
+        <label>Valor da Mensalidade (R$)</label>
         <input type="number" step="0.01" id="pagValor" placeholder="150.00" required>
 
         <label>Forma de Pagamento</label>
         <select id="pagMetodo">
-          <option value="PIX">⚡ PIX (QR Code / Copia e Cola)</option>
+          <option value="PIX">⚡ PIX</option>
           <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
           <option value="Cartão de Débito">💳 Cartão de Débito / NFC</option>
-          <option value="Dinheiro">💵 Dinheiro em Espécie</option>
+          <option value="Dinheiro em Espécie">💵 Dinheiro (R$)</option>
         </select>
 
-        <label>Status da Mensalidade</label>
+        <label>Status</label>
         <select id="pagStatus">
           <option value="Pago">Pago (PAGO - OSS!)</option>
           <option value="Pendente">Pendente (Em Aberto)</option>
         </select>
 
-        <button type="submit">Salvar Pagamento</button>
+        <button type="submit">Salvar Aluno & Pagamento</button>
       </form>
     </div>
 
-    <!-- Registros Salvos -->
     <div class="card">
-      <h3>🥋 Histórico do Caixa</h3>
+      <h3>🥋 Lista de Praticantes</h3>
       <div id="listaPagamentos">Carregando dados...</div>
+    </div>
+  </div>
+
+  <!-- ABA ESTATÍSTICAS -->
+  <div id="tab-stats" class="tab-content">
+    <div class="card">
+      <h3>📊 Estatísticas do Tatame</h3>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <small>Total Arrecadado</small>
+          <div id="statTotal" class="stat-number">R$ 0,00</div>
+        </div>
+        <div class="stat-box">
+          <small>Total Praticantes</small>
+          <div id="statAlunos" class="stat-number">0</div>
+        </div>
+        <div class="stat-box">
+          <small>Mensalidades Pagas</small>
+          <div id="statPagas" class="stat-number" style="color: var(--success);">0</div>
+        </div>
+        <div class="stat-box">
+          <small>Pendentes</small>
+          <div id="statPendentes" class="stat-number" style="color: var(--warning);">0</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
     const API_URL = 'https://tatameone-api.onrender.com';
+    let fotoBase64 = '';
+    let dadosPagamentos = [];
+
+    // Função para formatar qualquer valor numérico em Real (BRL)
+    function formatarReal(valor) {
+      const val = parseFloat(valor) || 0;
+      return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
 
     function toggleTipoPessoa() {
       const tipo = document.getElementById('tipoPessoa').value;
@@ -146,25 +208,45 @@
       event.target.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
 
-      if (tab === 'pagamentos') fetchPagamentos();
+      if (tab === 'pagamentos' || tab === 'stats') fetchPagamentos();
     }
 
-    // IMPRESSÃO DE RECIBO (Wi-Fi / Bluetooth via Sistema)
-    function imprimirRecibo(aluno, valor, metodo, data) {
-      const reciboWindow = window.open('', '', 'width=300,height=400');
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          fotoBase64 = e.target.result;
+          document.getElementById('imgPreview').src = fotoBase64;
+        }
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // IMPRESSÃO DO COMPROVANTE OFICIAL EM MOEDA BRASILEIRA (BRL)
+    function imprimirRecibo(aluno, faixa, etaria, valor, metodo) {
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const horaHoje = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const valorFormatado = formatarReal(valor);
+
+      const reciboWindow = window.open('', '', 'width=320,height=450');
       reciboWindow.document.write(`
-        <div style="font-family: monospace; font-size: 12px; text-align: center;">
-          <h2>🥋 TATAMEONE 🥋</h2>
+        <div style="font-family: monospace; font-size: 12px; text-align: center; padding: 10px;">
+          <h2 style="margin:0;">🥋 TATAMEONE 🥋</h2>
+          <p style="margin: 4px 0;">SISTEMA DE GESTÃO DE JIU-JITSU</p>
           <p>--------------------------------</p>
-          <p><strong>COMPROVANTE DE PAGAMENTO</strong></p>
+          <p style="margin: 0; font-size: 14px;"><strong>RECIBO DE PAGAMENTO</strong></p>
+          <p style="margin: 4px 0;"><strong>MOEDA: REAL (BRL)</strong></p>
           <p>--------------------------------</p>
           <p style="text-align: left;"><strong>Aluno:</strong> ${aluno}</p>
-          <p style="text-align: left;"><strong>Valor:</strong> R$ ${valor}</p>
-          <p style="text-align: left;"><strong>Método:</strong> ${metodo}</p>
-          <p style="text-align: left;"><strong>Data:</strong> ${data}</p>
+          <p style="text-align: left;"><strong>Graduação:</strong> Faixa ${faixa}</p>
+          <p style="text-align: left;"><strong>Categoria:</strong> ${etaria}</p>
+          <p style="text-align: left;"><strong>Valor Pago:</strong> ${valorFormatado}</p>
+          <p style="text-align: left;"><strong>Forma de Pago:</strong> ${metodo}</p>
+          <p style="text-align: left;"><strong>Data / Hora:</strong> ${dataHoje} às ${horaHoje}</p>
           <p>--------------------------------</p>
-          <p>Mantenha o treino em dia!</p>
-          <p><strong>OSS!</strong></p>
+          <p>Treino pago! Mantenha a disciplina no dojo.</p>
+          <p style="font-size: 14px;"><strong>OSS! 🥋</strong></p>
         </div>
       `);
       reciboWindow.document.close();
@@ -173,38 +255,70 @@
       reciboWindow.close();
     }
 
-    // BUSCAR PAGAMENTOS
+    // BUSCAR DADOS E ATUALIZAR LISTA/ESTATÍSTICAS
     async function fetchPagamentos() {
       const container = document.getElementById('listaPagamentos');
       try {
         const res = await fetch(`${API_URL}/pagamentos`);
-        const data = await res.json();
+        dadosPagamentos = await res.json();
 
-        if (!Array.isArray(data) || data.length === 0) {
-          container.innerHTML = '<p style="color: var(--subtext)">Nenhum registro encontrado no tatame.</p>';
+        if (!Array.isArray(dadosPagamentos) || dadosPagamentos.length === 0) {
+          container.innerHTML = '<p style="color: var(--subtext)">Nenhum registro encontrado.</p>';
+          atualizarEstatisticas([]);
           return;
         }
 
-        container.innerHTML = data.map(item => `
+        container.innerHTML = dadosPagamentos.map(item => `
           <div class="item">
-            <div class="item-header">
-              <div>
-                <strong>${item.aluno || item.nome}</strong><br>
-                <small style="color: var(--subtext)">R$ ${item.valor} | ${item.metodo || 'PIX'}</small>
+            <img class="item-avatar" src="${item.foto || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" alt="Foto">
+            <div class="item-info">
+              <div class="item-header">
+                <div>
+                  <strong>${item.aluno || item.nome}</strong><br>
+                  <small style="color: var(--subtext)">
+                    <span class="badge badge-faixa">${item.faixa || 'Branca'}</span> | ${item.faixaEtaria || 'Adulto'}
+                  </small>
+                </div>
+                <span class="badge ${item.status === 'Pago' ? 'badge-pago' : 'badge-pendente'}">${item.status}</span>
               </div>
-              <span class="badge ${item.status === 'Pago' ? 'badge-pago' : 'badge-pendente'}">${item.status}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                <small style="color: var(--subtext)">${formatarReal(item.valor)} (${item.metodo || 'PIX'})</small>
+                <button class="btn-print" onclick="imprimirRecibo('${item.aluno || item.nome}', '${item.faixa || 'Branca'}', '${item.faixaEtaria || 'Adulto'}', '${item.valor}', '${item.metodo || 'PIX'}')">
+                  🖨️ Recibo BRL
+                </button>
+              </div>
             </div>
-            <button class="btn-print" onclick="imprimirRecibo('${item.aluno || item.nome}', '${item.valor}', '${item.metodo || 'PIX'}', '${new Date().toLocaleDateString()}')">
-              🖨️ Imprimir Recibo
-            </button>
           </div>
         `).join('');
+
+        atualizarEstatisticas(dadosPagamentos);
       } catch (err) {
-        container.innerHTML = '<p style="color: #f75a68">Erro ao buscar mensalidades do tatame.</p>';
+        container.innerHTML = '<p style="color: #f75a68">Erro ao buscar dados do servidor.</p>';
       }
     }
 
-    // SALVAR PERFIL
+    function atualizarEstatisticas(lista) {
+      let total = 0;
+      let pagas = 0;
+      let pendentes = 0;
+
+      lista.forEach(item => {
+        const val = parseFloat(item.valor) || 0;
+        if (item.status === 'Pago') {
+          total += val;
+          pagas++;
+        } else {
+          pendentes++;
+        }
+      });
+
+      document.getElementById('statTotal').innerText = formatarReal(total);
+      document.getElementById('statAlunos').innerText = lista.length;
+      document.getElementById('statPagas').innerText = pagas;
+      document.getElementById('statPendentes').innerText = pendentes;
+    }
+
+    // GRAVAR DADOS DO PERFIL
     document.getElementById('formPerfil').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
@@ -221,20 +335,23 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        alert('OSS! Dados do Dojô salvos com sucesso!');
+        alert('OSS! Perfil salvo com sucesso!');
       } catch (err) {
-        alert('Erro ao registrar dados.');
+        alert('Erro ao salvar perfil.');
       }
     });
 
-    // SALVAR PAGAMENTO
+    // GRAVAR NOVO ALUNO COM FOTO, FAIXA E FAIXA ETÁRIA
     document.getElementById('formPagamento').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
         aluno: document.getElementById('pagAluno').value,
+        faixaEtaria: document.getElementById('pagFaixaEtaria').value,
+        faixa: document.getElementById('pagFaixa').value,
         valor: document.getElementById('pagValor').value,
         metodo: document.getElementById('pagMetodo').value,
-        status: document.getElementById('pagStatus').value
+        status: document.getElementById('pagStatus').value,
+        foto: fotoBase64
       };
 
       try {
@@ -243,12 +360,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        alert('OSS! Mensalidade registrada com sucesso!');
+        alert('OSS! Aluno e mensalidade cadastrados!');
         document.getElementById('pagAluno').value = '';
         document.getElementById('pagValor').value = '';
+        document.getElementById('pagFoto').value = '';
+        document.getElementById('imgPreview').src = 'https://cdn-icons-png.flaticon.com/512/847/847969.png';
+        fotoBase64 = '';
         fetchPagamentos();
       } catch (err) {
-        alert('Erro ao gravar mensalidade.');
+        alert('Erro ao cadastrar aluno.');
       }
     });
   </script>
