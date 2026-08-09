@@ -18,21 +18,25 @@
     input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
     button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
     .btn-print { background: #00b37e; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 10px; cursor: pointer; }
-    .btn-delete { background: #e52e4d; font-weight: bold; border: none; padding: 10px; width: 100%; border-radius: 4px; color: #fff; margin-top: 8px; cursor: pointer; }
     
-    /* ESTILO DO COMPROVANTE */
+    /* ESTILO LISTA E COMPROVANTE */
     .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; text-align: center; }
     .receipt-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff334b; margin-bottom: 10px; }
     .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; }
 
-    /* REGRAS EXCLUSIVAS PARA IMPRESSÃO */
+    .aluno-card { background: #121214; border: 1px solid #323238; padding: 12px; border-radius: 6px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .aluno-info { display: flex; align-items: center; gap: 10px; }
+    .aluno-info img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #ff334b; }
+    .btn-delete-item { background: #e52e4d; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+
+    /* IMPRESSÃO */
     @media print {
       body * { visibility: hidden; }
       #areaComprovante, #areaComprovante * { visibility: visible; }
       #areaComprovante { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
       .receipt-card { border: 1px solid #000; background: #fff; color: #000; }
       .receipt-card h4 { color: #000; }
-      .btn-print, .btn-delete { display: none; }
+      .btn-print { display: none; }
     }
   </style>
 </head>
@@ -49,7 +53,7 @@
     <button type="button" class="tab-btn" data-tab="stats">📊 Estatísticas</button>
   </div>
 
-  <!-- ABA PERFIL / DOJO -->
+  <!-- ABA PERFIL -->
   <div id="tab-perfil" class="tab-content active">
     <h3>📜 Dados do Dojô / Proprietário</h3>
     <label>Nome da Academia / Dojô</label>
@@ -61,12 +65,12 @@
     <label>Endereço Completo</label>
     <input type="text" id="enderecoDojo" placeholder="Rua, Número, Bairro, Cidade">
 
-    <button type="button" class="form-btn" onclick="salvarDojo()">Gravar Dados do Dojô</button>
+    <button type="button" class="form-btn" onclick="alert('Dados salvos!')">Gravar Dados do Dojô</button>
   </div>
 
   <!-- ABA ALUNOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
-    <h3>🥋 Cadastro de Aluno</h3>
+    <h3>🥋 Cadastrar Aluno</h3>
     <form id="formAluno">
       <label>Foto do Aluno</label>
       <input type="file" id="fotoInput" accept="image/*">
@@ -94,7 +98,7 @@
       <label>Valor (R$)</label>
       <input type="number" id="valorPagamento" placeholder="150,00" required>
 
-      <button type="button" class="form-btn" onclick="registrarPagamento()">Gerar Comprovante</button>
+      <button type="button" class="form-btn" onclick="registrarPagamento()">Cadastrar Aluno & Comprovante</button>
     </form>
 
     <div id="areaComprovante" style="display: none;">
@@ -111,8 +115,14 @@
         <p><strong>Valor:</strong> R$ <span id="compValor">0,00</span></p>
         
         <button type="button" class="btn-print" onclick="window.print()">🖨️ Imprimir (Bluetooth / Wi-Fi)</button>
-        <button type="button" class="btn-delete" onclick="excluirAluno()">🗑️ Excluir Aluno</button>
       </div>
+    </div>
+
+    <!-- LISTA DE ALUNOS COM EXCLUSÃO -->
+    <hr style="border: 0.5px solid #323238; margin: 20px 0;">
+    <h3>📋 Alunos Cadastrados / Gestão de Exclusão</h3>
+    <div id="listaAlunos">
+      <p style="color: #8d8d99; font-size: 0.85rem;" id="semAlunos">Nenhum aluno cadastrado no momento.</p>
     </div>
   </div>
 
@@ -121,6 +131,8 @@
   </div>
 
   <script>
+    let alunos = [];
+
     document.addEventListener('DOMContentLoaded', function() {
       const buttons = document.querySelectorAll('.tab-btn');
       const contents = document.querySelectorAll('.tab-content');
@@ -135,10 +147,6 @@
         });
       });
     });
-
-    function salvarDojo() {
-      alert('Dados do Dojô salvos com sucesso!');
-    }
 
     function registrarPagamento() {
       const dojo = document.getElementById('nomeDojo').value || 'TatameOne';
@@ -165,26 +173,61 @@
       document.getElementById('compFaixa').innerText = faixa;
       document.getElementById('compValor').innerText = parseFloat(valor || 0).toFixed(2);
 
+      let fotoUrl = '';
       if (fotoInput.files && fotoInput.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          document.getElementById('compFoto').src = e.target.result;
+          fotoUrl = e.target.result;
+          document.getElementById('compFoto').src = fotoUrl;
+          adicionarAlunoLista(nome, faixa, idade, fotoUrl);
         }
         reader.readAsDataURL(fotoInput.files[0]);
       } else {
         document.getElementById('compFoto').src = '';
+        adicionarAlunoLista(nome, faixa, idade, '');
       }
       
       document.getElementById('areaComprovante').style.display = 'block';
     }
 
-    function excluirAluno() {
-      if (confirm("Tem certeza que deseja excluir este aluno e limpar a tela?")) {
-        document.getElementById('formAluno').reset();
-        document.getElementById('areaComprovante').style.display = 'none';
-        document.getElementById('compFoto').src = '';
-        alert("Aluno excluído com sucesso!");
+    function adicionarAlunoLista(nome, faixa, idade, foto) {
+      const id = Date.now();
+      alunos.push({ id, nome, faixa, idade, foto });
+      renderizarLista();
+      document.getElementById('formAluno').reset();
+    }
+
+    function removerAluno(id) {
+      if (confirm('Deseja realmente excluir este aluno do sistema?')) {
+        alunos = alunos.filter(a => a.id !== id);
+        renderizarLista();
       }
+    }
+
+    function renderizarLista() {
+      const container = document.getElementById('listaAlunos');
+      if (alunos.length === 0) {
+        container.innerHTML = '<p style="color: #8d8d99; font-size: 0.85rem;">Nenhum aluno cadastrado no momento.</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      alunos.forEach(aluno => {
+        const imgTag = aluno.foto ? `<img src="${aluno.foto}" alt="Foto">` : `<div style="width:45px;height:45px;border-radius:50%;background:#323238;display:flex;align-items:center;justify-content:center;">🥋</div>`;
+        
+        container.innerHTML += `
+          <div class="aluno-card">
+            <div class="aluno-info">
+              ${imgTag}
+              <div>
+                <strong>${aluno.nome}</strong><br>
+                <small style="color:#a8a8b3">${aluno.faixa} - ${aluno.idade}</small>
+              </div>
+            </div>
+            <button class="btn-delete-item" onclick="removerAluno(${aluno.id})">🗑️ Excluir</button>
+          </div>
+        `;
+      });
     }
   </script>
 </body>
