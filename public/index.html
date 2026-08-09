@@ -62,6 +62,32 @@ jpg">
     .stat-box { background: #121214; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #29292e; }
     .stat-number { font-size: 1.4rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
   </style>
+<script>
+function changeTab(tabName, btnElement) {
+  const contents = document.querySelectorAll('.tab-content');
+  contents.forEach(c => {
+    c.classList.remove('active');
+    c.style.display = 'none';
+  });
+
+  const btns = document.querySelectorAll('.tab-btn');
+  btns.forEach(b => b.classList.remove('active'));
+
+  const selectedContent = document.getElementById('tab-' + tabName);
+  if (selectedContent) {
+    selectedContent.classList.add('active');
+    selectedContent.style.display = 'block';
+  }
+
+  if (btnElement) {
+    btnElement.classList.add('active');
+  }
+
+  if ((tabName === 'pagamentos' || tabName === 'stats') && typeof fetchPagamentos === 'function') {
+    try { fetchPagamentos(); } catch(e) { console.log(e); }
+  }
+}
+</script>
 </head>
 <body>
 
@@ -72,10 +98,10 @@ jpg">
 
   <!-- Navegação por Abas -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('perfil')">Perfil / Dojô</button>
-    <button class="tab-btn" onclick="switchTab('pagamentos')">Alunos & Caixa</button>
-    <button class="tab-btn" onclick="switchTab('stats')">📊 Estatísticas</button>
-  </div>
+  <button class="tab-btn active" onclick="changeTab('perfil', this)">Perfil / Dojô</button>
+  <button class="tab-btn" onclick="changeTab('pagamentos', this)">Alunos & Caixa</button>
+  <button class="tab-btn" onclick="changeTab('stats', this)">📊 Estatísticas</button>
+</div>
 
   <!-- ABA PERFIL / DOJÔ -->
   <div id="tab-perfil" class="tab-content active">
