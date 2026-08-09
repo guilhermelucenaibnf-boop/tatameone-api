@@ -1,15 +1,16 @@
 {
-  "name": "TatameOne",
   "short_name": "TatameOne",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#121214",
-  "theme_color": "#8257e5",
+  "name": "TatameOne - Gestão de Dojô",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3048/3048381.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "logo tatameone~2.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": ".",
+  "background_color": "#121214",
+  "theme_color": "#e52e3d",
+  "display": "standalone"
 }
+
