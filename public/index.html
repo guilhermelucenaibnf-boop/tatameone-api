@@ -103,7 +103,8 @@ jpg">
         <button type="submit">Gravar Dados no Tatame</button>
       </form>
     </div>
-  </div>
+  </div>async function
+
 
   <!-- ABA ALUNOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
@@ -213,13 +214,15 @@ jpg">
       event.target.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
 
-      if (tab === 'pagamentos' || tab === 'stats') fetchPagamentos();
+      if (tab === 'pagamentos' || tab === 'stats') 
+fetchPagamentos();
     }
 
     function previewImage(event) {
       const file = event.target.files[0];
       if (file) {
         const reader = new FileReader();
+
         reader.onload = function(e) {
           fotoBase64 = e.target.result;
           document.getElementById('imgPreview').src = fotoBase64;
@@ -264,7 +267,7 @@ jpg">
     async function fetchPagamentos() {
       const container = document.getElementById('listaPagamentos');
       try {
-        const res = await fetch(`${API_URL}/pagamentos`);
+        const res = await fetch(`${API_URL}/diario`);
         dadosPagamentos = await res.json();
 
         if (!Array.isArray(dadosPagamentos) || dadosPagamentos.length === 0) {
@@ -360,7 +363,7 @@ jpg">
       };
 
       try {
-        await fetch(`${API_URL}/pagamentos`, {
+        await fetch(`${API_URL}/diario`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -370,10 +373,13 @@ jpg">
         document.getElementById('pagValor').value = '';
         document.getElementById('pagFoto').value = '';
         document.getElementById('imgPreview').src = 'https://cdn-icons-png.flaticon.com/512/847/847969.png';
-        fotoBase64 = '';
+                fotoBase64 = '';
         fetchPagamentos();
       } catch (err) {
         alert('Erro ao cadastrar aluno.');
+      }
+    });
+
       }
     });
   </script>
