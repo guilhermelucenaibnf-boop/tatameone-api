@@ -48,12 +48,22 @@
     <button type="button" class="tab-btn" data-tab="stats">📊 Estatísticas</button>
   </div>
 
+  <!-- ABA PERFIL / DOJO -->
   <div id="tab-perfil" class="tab-content active">
-    <h3>📜 Dados do Dojô</h3>
-    <input type="text" id="nomeDojo" placeholder="Nome da Academia">
-    <button type="button" class="form-btn" onclick="alert('Dados salvos!')">Gravar Dados</button>
+    <h3>📜 Dados do Dojô / Proprietário</h3>
+    <label>Nome da Academia / Dojô</label>
+    <input type="text" id="nomeDojo" placeholder="Ex: Academia Team TatameOne">
+    
+    <label>CNPJ / CPF do Dojô</label>
+    <input type="text" id="cnpjDojo" placeholder="00.000.000/0001-00">
+    
+    <label>Endereço Completo</label>
+    <input type="text" id="enderecoDojo" placeholder="Rua, Número, Bairro, Cidade">
+
+    <button type="button" class="form-btn" onclick="salvarDojo()">Gravar Dados do Dojô</button>
   </div>
 
+  <!-- ABA ALUNOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
     <h3>🥋 Cadastro de Aluno</h3>
     <form id="formAluno">
@@ -90,6 +100,10 @@
       <div class="receipt-card">
         <img id="compFoto" src="" alt="Foto">
         <h4>🧾 COMPROVANTE DE PAGAMENTO</h4>
+        <p><strong>Dojô:</strong> <span id="compDojo">TatameOne</span></p>
+        <p><strong>CNPJ/CPF:</strong> <span id="compCnpj">-</span></p>
+        <p><strong>Endereço:</strong> <span id="compEndereco">-</span></p>
+        <hr style="border: 0.5px dashed #ff334b; margin: 10px 0;">
         <p><strong>Aluno:</strong> <span id="compAluno">-</span></p>
         <p><strong>Idade:</strong> <span id="compIdade">-</span></p>
         <p><strong>Graduação:</strong> <span id="compFaixa">-</span></p>
@@ -120,12 +134,24 @@
       });
     });
 
+    function salvarDojo() {
+      alert('Dados do Dojô salvos com sucesso!');
+    }
+
     function registrarPagamento() {
+      const dojo = document.getElementById('nomeDojo').value || 'TatameOne';
+      const cnpj = document.getElementById('cnpjDojo').value || 'Não informado';
+      const endereco = document.getElementById('enderecoDojo').value || 'Não informado';
+
       const nome = document.getElementById('nomeAluno').value;
       const idade = document.getElementById('idadeAluno').value;
       const faixa = document.getElementById('faixaAluno').value;
       const valor = document.getElementById('valorPagamento').value;
       const fotoInput = document.getElementById('fotoInput');
+
+      document.getElementById('compDojo').innerText = dojo;
+      document.getElementById('compCnpj').innerText = cnpj;
+      document.getElementById('compEndereco').innerText = endereco;
 
       document.getElementById('compAluno').innerText = nome;
       document.getElementById('compIdade').innerText = idade;
