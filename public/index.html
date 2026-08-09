@@ -17,9 +17,8 @@
     label { display: block; margin-top: 10px; font-size: 0.85rem; color: #a8a8b3; }
     input, select, button.form-btn { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #323238; background: #121214; color: #fff; box-sizing: border-box; }
     button.form-btn { background: #ff334b; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-    .stat-box { background: #121214; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #323238; }
-    .stat-number { font-size: 1.4rem; font-weight: bold; color: #00b37e; margin-top: 5px; }
+    .receipt-card { background: #121214; border: 1px dashed #ff334b; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.85rem; }
+    .receipt-card h4 { margin: 0 0 10px 0; color: #ff334b; text-align: center; }
   </style>
 </head>
 <body>
@@ -46,42 +45,59 @@
         <option value="PF">Pessoa Física (Professor / CPF)</option>
       </select>
       <label>Nome da Academia / Dojô</label>
-      <input type="text" placeholder="Ex: Academia Team TatameOne">
+      <input type="text" id="nomeDojo" placeholder="Ex: Academia Team TatameOne">
       <label>Documento (CPF ou CNPJ)</label>
-      <input type="text" placeholder="00.000.000/0001-00">
+      <input type="text" id="docDojo" placeholder="00.000.000/0001-00">
       <label>Chave PIX</label>
-      <input type="text" placeholder="CPF, CNPJ, E-mail ou Celular">
-      <label>Endereço do Tatame</label>
-      <input type="text" placeholder="Rua, Número, Bairro, Cidade">
-      <button type="button" class="form-btn">Gravar Dados no Tatame</button>
+      <input type="text" id="pixDojo" placeholder="CPF, CNPJ, E-mail ou Celular">
+      <button type="button" class="form-btn" onclick="alert('Dados salvos no Tatame!')">Gravar Dados no Tatame</button>
     </form>
   </div>
 
   <!-- ABA 2: ALUNOS & CAIXA -->
   <div id="tab-pagamentos" class="tab-content">
-    <h3>🥋 Gestão de Alunos e Caixa</h3>
-    <p style="color: #a8a8b3; font-size: 0.9rem;">Área de cobranças e matrículas.</p>
-    <div id="listaPagamentos">
-      <p style="color: #8d8d99; font-size: 0.85rem;">Nenhum registro no caixa no momento.</p>
+    <h3>🥋 Cadastrar Aluno & Lançar Mensalidade</h3>
+    <form id="formAluno">
+      <label>Nome do Aluno</label>
+      <input type="text" id="nomeAluno" placeholder="Ex: João Silva" required>
+      
+      <label>Faixa / Graduação</label>
+      <select id="faixaAluno">
+        <option value="Branca">White Belt (Branca)</option>
+        <option value="Azul">Blue Belt (Azul)</option>
+        <option value="Roxa">Purple Belt (Roxa)</option>
+        <option value="Marrom">Brown Belt (Marrom)</option>
+        <option value="Preta">Black Belt (Preta)</option>
+      </select>
+
+      <label>Valor da Mensalidade (R$)</label>
+      <input type="number" id="valorPagamento" placeholder="150,00" required>
+
+      <button type="button" class="form-btn" onclick="registrarPagamento()">Lançar Pagamento & Gerar Comprovante</button>
+    </form>
+
+    <!-- ÁREA DO COMPROVANTE -->
+    <div id="areaComprovante" style="display: none;">
+      <div class="receipt-card" id="comprovantePrint">
+        <h4>🧾 COMPROVANTE DE PAGAMENTO</h4>
+        <p><strong>Dojô:</strong> <span id="compDojo">TatameOne</span></p>
+        <p><strong>Aluno:</strong> <span id="compAluno">-</span></p>
+        <p><strong>Faixa:</strong> <span id="compFaixa">-</span></p>
+        <p><strong>Valor:</strong> R$ <span id="compValor">0,00</span></p>
+        <p><strong>Data:</strong> <span id="compData">-</span></p>
+        <p style="text-align: center; margin-top: 10px; color: #00b37e; font-weight: bold;">Status: PAGO OSS!</p>
+      </div>
     </div>
   </div>
 
   <!-- ABA 3: ESTATÍSTICAS -->
   <div id="tab-stats" class="tab-content">
     <h3>📊 Painel do Tatame</h3>
-    <div class="stats-grid">
-      <div class="stat-box">
-        <div>Alunos Ativos</div>
-        <div class="stat-number">0</div>
-      </div>
-      <div class="stat-box">
-        <div>Caixa do Mês</div>
-        <div class="stat-number">R$ 0,00</div>
-      </div>
-    </div>
+    <p>Em breve resumo de caixa do mês e total de alunos ativos.</p>
   </div>
 
   <script>
+    // Navegação por Abas
     document.addEventListener('DOMContentLoaded', function() {
       const buttons = document.querySelectorAll('.tab-btn');
       const contents = document.querySelectorAll('.tab-content');
@@ -91,11 +107,9 @@
           e.preventDefault();
           const targetTab = this.getAttribute('data-tab');
 
-          // Desativa todos os botões e abas
           buttons.forEach(b => b.classList.remove('active'));
           contents.forEach(c => c.classList.remove('active'));
 
-          // Ativa o botão e a aba correspondente
           this.classList.add('active');
           const targetContent = document.getElementById('tab-' + targetTab);
           if (targetContent) {
@@ -104,6 +118,28 @@
         });
       });
     });
+
+    // Função de Registrar Pagamento e Gerar Comprovante
+    function registrarPagamento() {
+      const nome = document.getElementById('nomeAluno').value;
+      const faixa = document.getElementById('faixaAluno').value;
+      const valor = document.getElementById('valorPagamento').value;
+      const dojo = document.getElementById('nomeDojo').value || 'TatameOne';
+
+      if (!nome || !valor) {
+        alert('Por favor, preencha o Nome do Aluno e o Valor!');
+        return;
+      }
+
+      document.getElementById('compDojo').innerText = dojo;
+      document.getElementById('compAluno').innerText = nome;
+      document.getElementById('compFaixa').innerText = faixa;
+      document.getElementById('compValor').innerText = parseFloat(valor).toFixed(2);
+      document.getElementById('compData').innerText = new Date().toLocaleDateString('pt-BR');
+
+      document.getElementById('areaComprovante').style.display = 'block';
+      alert('Pagamento registrado com sucesso!');
+    }
   </script>
 </body>
 </html>
