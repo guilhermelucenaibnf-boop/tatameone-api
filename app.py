@@ -197,12 +197,12 @@ BASE = """
 .big{font-size:28px;font-weight:800}.muted{color:#6b7280}
 .nav-wrap{max-width:1150px;margin:auto;padding:14px 18px 0}
 .nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.nav a.btn{min-height:82px;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;text-align:left;box-shadow:0 2px 12px #00000012}
-.nav-icon{font-size:30px;line-height:1;width:38px;text-align:center;flex:0 0 38px}
+.nav a.btn{min-height:96px;border-radius:18px;padding:16px 18px;display:flex;align-items:center;gap:15px;text-align:left;box-shadow:0 3px 14px #00000014}
+.nav-icon{font-size:38px;line-height:1;width:52px;text-align:center;flex:0 0 52px}
 .nav-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.nav-title{font-size:17px;font-weight:800;line-height:1.1}
-.nav-desc{font-size:12px;color:#6b7280;font-weight:400;line-height:1.2}
-.nav-arrow{font-size:25px;font-weight:800;color:#16a34a}
+.nav-title{font-size:20px;font-weight:800;line-height:1.1}
+.nav-desc{font-size:13px;color:#6b7280;font-weight:400;line-height:1.25}
+.nav-arrow{font-size:34px;font-weight:800;color:#16a34a}
 .nav a.danger .nav-desc,.nav a.danger .nav-arrow{color:#fee2e2}
 a.btn,button{border:0;border-radius:10px;padding:11px 14px;background:#111827;color:white;text-decoration:none;cursor:pointer}
 a.green,button.green{background:#16a34a} a.light{background:white;color:#111827;border:1px solid #ddd}
@@ -212,12 +212,13 @@ th,td{text-align:left;padding:10px;border-bottom:1px solid #eee}.pill{padding:5p
 h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
 @media(max-width:760px){
   .wrap{padding:14px}.top{padding:14px 16px}.big{font-size:24px}
-  .nav-wrap{padding:14px}
-  .nav{grid-template-columns:1fr;gap:10px}
-  .nav a.btn{min-height:78px;padding:13px 16px}
-  .nav-icon{font-size:29px}
-  .nav-title{font-size:18px}
-  .nav-desc{font-size:12px}
+  .nav-wrap{padding:14px 12px 8px}
+  .nav{grid-template-columns:1fr;gap:12px}
+  .nav a.btn{min-height:108px;padding:17px 18px;border-radius:18px}
+  .nav-icon{font-size:44px;width:58px;flex-basis:58px}
+  .nav-title{font-size:24px}
+  .nav-desc{font-size:14px}
+  .nav-arrow{font-size:38px}
   th:nth-child(n+4),td:nth-child(n+4){display:none}
 }
 </style></head><body>
