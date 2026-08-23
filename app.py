@@ -194,23 +194,46 @@ BASE = """
 .brand{font-size:21px;font-weight:800}.brand b{color:#22c55e}
 .wrap{max-width:1150px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .card{background:white;border-radius:16px;padding:16px;box-shadow:0 2px 12px #00000010}
-.big{font-size:28px;font-weight:800}.muted{color:#6b7280}.nav{display:flex;gap:8px;overflow:auto;padding:10px 0}
+.big{font-size:28px;font-weight:800}.muted{color:#6b7280}
+.nav-wrap{max-width:1150px;margin:auto;padding:14px 18px 0}
+.nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.nav a.btn{min-height:82px;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;text-align:left;box-shadow:0 2px 12px #00000012}
+.nav-icon{font-size:30px;line-height:1;width:38px;text-align:center;flex:0 0 38px}
+.nav-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.nav-title{font-size:17px;font-weight:800;line-height:1.1}
+.nav-desc{font-size:12px;color:#6b7280;font-weight:400;line-height:1.2}
+.nav-arrow{font-size:25px;font-weight:800;color:#16a34a}
+.nav a.danger .nav-desc,.nav a.danger .nav-arrow{color:#fee2e2}
 a.btn,button{border:0;border-radius:10px;padding:11px 14px;background:#111827;color:white;text-decoration:none;cursor:pointer}
 a.green,button.green{background:#16a34a} a.light{background:white;color:#111827;border:1px solid #ddd}
 input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:10px;margin:5px 0 12px}
 label{font-size:13px;font-weight:700} table{width:100%;border-collapse:collapse;background:white}
 th,td{text-align:left;padding:10px;border-bottom:1px solid #eee}.pill{padding:5px 8px;border-radius:99px;background:#dcfce7;font-size:12px}
 h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
-@media(max-width:600px){.wrap{padding:12px}.top{padding:12px}.big{font-size:24px}th:nth-child(n+4),td:nth-child(n+4){display:none}}
+@media(max-width:760px){
+  .wrap{padding:14px}.top{padding:14px 16px}.big{font-size:24px}
+  .nav-wrap{padding:14px}
+  .nav{grid-template-columns:1fr;gap:10px}
+  .nav a.btn{min-height:78px;padding:13px 16px}
+  .nav-icon{font-size:29px}
+  .nav-title{font-size:18px}
+  .nav-desc{font-size:12px}
+  th:nth-child(n+4),td:nth-child(n+4){display:none}
+}
 </style></head><body>
 <div class="top"><div class="brand">TATAME<b>ONE</b></div><div>{{session.get('nome','')}}</div></div>
 {% if session.get('uid') %}
-<div class="wrap"><div class="nav">
-<a class="btn light" href="/">Painel</a><a class="btn light" href="/alunos">Alunos</a>
-<a class="btn light" href="/checkin">Check-in</a><a class="btn light" href="/planos">Planos</a>
-<a class="btn light" href="/financeiro">Financeiro</a><a class="btn light" href="/aulas">Aulas</a>
-<a class="btn light" href="/avaliacoes">Avaliações</a><a class="btn light" href="/config">Configurações</a>
-<a class="btn danger" href="/logout">Sair</a></div></div>
+<div class="nav-wrap"><div class="nav">
+<a class="btn light" href="/"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/alunos"><span class="nav-icon">👥</span><span class="nav-copy"><span class="nav-title">Alunos</span><span class="nav-desc">Cadastros e acompanhamento</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/checkin"><span class="nav-icon">✅</span><span class="nav-copy"><span class="nav-title">Check-in</span><span class="nav-desc">Registrar entrada dos alunos</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/planos"><span class="nav-icon">💳</span><span class="nav-copy"><span class="nav-title">Planos</span><span class="nav-desc">Planos e mensalidades</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/financeiro"><span class="nav-icon">💰</span><span class="nav-copy"><span class="nav-title">Financeiro</span><span class="nav-desc">Pagamentos e recebimentos</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/aulas"><span class="nav-icon">📅</span><span class="nav-copy"><span class="nav-title">Aulas</span><span class="nav-desc">Agenda, horários e professores</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/avaliacoes"><span class="nav-icon">📈</span><span class="nav-copy"><span class="nav-title">Avaliações</span><span class="nav-desc">Avaliações e evolução</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>
+<a class="btn danger" href="/logout"><span class="nav-icon">🚪</span><span class="nav-copy"><span class="nav-title">Sair</span><span class="nav-desc">Encerrar sessão</span></span><span class="nav-arrow">›</span></a>
+</div></div>
 {% endif %}
 <div class="wrap">{{body|safe}}</div></body></html>
 """
