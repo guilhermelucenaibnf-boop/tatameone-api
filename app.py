@@ -441,6 +441,9 @@ def config():
     <div class="card"><h2>Modalidades disponíveis</h2>{% for m in mods %}<span class="pill">{{m.nome}}</span> {% endfor %}
     <p class="muted">A estrutura aceita modalidades diferentes por academia.</p><h3>Plano do sistema</h3><p>{{ac.plano}}</p></div></div>""",ac=ac,mods=mods)
 
+# Inicializa o banco também quando o aplicativo é carregado pelo Gunicorn/Render.
+# init_db usa CREATE TABLE IF NOT EXISTS, portanto pode ser executado com segurança.
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)), debug=False)
