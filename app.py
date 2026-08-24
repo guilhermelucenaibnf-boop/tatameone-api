@@ -659,7 +659,7 @@ def aluno_novo():
 
       <div>
         <label>Telefone de emergência</label>
-        <input name="telefone_emergencia">
+        <input name="telefone_emergencia" id="telefone_emergencia">
       </div>
 
     </div>
