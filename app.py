@@ -2,6 +2,9 @@ import os
 import psycopg
 from psycopg.rows import dict_row
 import secrets
+import qrcode
+import io
+import base64
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, flash
@@ -575,6 +578,14 @@ def aluno(id):
 
     con.close()
 
+    # Gerar QR Code real do aluno
+    qr_img = None
+    if x.get("qr_token"):
+        img = qrcode.make(x["qr_token"])
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        qr_img = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
     return page(x["nome"],"""
     <h1>{{x.nome}}</h1>
 
@@ -672,10 +683,19 @@ def aluno(id):
 
     <br>
 
-    <div class="card">
-      <h2>📱 QR/Token de check-in</h2>
-      <p style="font-size:20px;word-break:break-all">
-        {{x.qr_token or '-'}}
+    <div class="card" style="text-align:center">
+      <h2>📱 QR Code do aluno</h2>
+
+      {% if qr_img %}
+      <img src="{{qr_img}}"
+           alt="QR Code do aluno"
+           style="width:240px;max-width:80%;height:auto;margin:15px auto;display:block">
+
+      <p class="muted">Apresente este QR Code no check-in</p>
+      {% endif %}
+
+      <p style="font-size:16px;word-break:break-all">
+        <b>Token:</b> {{x.qr_token or '-'}}
       </p>
     </div>
 
@@ -755,7 +775,7 @@ def aluno(id):
       </p>
     </div>
 
-    """,x=x,pags=pags,checks=checks)
+    """,x=x,pags=pags,checks=checks,qr_img=qr_img)
 
 
 @app.route("/alunos/<int:id>/desativar", methods=["POST"])
