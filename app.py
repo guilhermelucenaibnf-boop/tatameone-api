@@ -554,17 +554,158 @@ function preencherEmergencia(tipo) {
 @login_required
 def aluno(id):
     con=db()
-    x=con.cursor().execute("SELECT * FROM alunos WHERE id=%s AND academia_id=%s",(id,aid())).fetchone()
-    pags=con.cursor().execute("SELECT * FROM pagamentos WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
-    checks=con.cursor().execute("SELECT * FROM checkins WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
+    x=con.cursor().execute(
+        "SELECT * FROM alunos WHERE id=%s AND academia_id=%s",
+        (id,aid())
+    ).fetchone()
+
+    if not x:
+        con.close()
+        return "Aluno não encontrado",404
+
+    pags=con.cursor().execute(
+        "SELECT * FROM pagamentos WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",
+        (id,aid())
+    ).fetchall()
+
+    checks=con.cursor().execute(
+        "SELECT * FROM checkins WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",
+        (id,aid())
+    ).fetchall()
+
     con.close()
-    if not x:return "Aluno não encontrado",404
+
     return page(x["nome"],"""
-    <h1>{{x.nome}}</h1><p><span class="pill">{{x.modalidade or 'Sem modalidade'}}</span> {{x.graduacao or ''}}</p>
-    <div class="grid"><div class="card"><b>Telefone</b><p>{{x.telefone or '-'}}</p></div>
-    <div class="card"><b>QR/Token de check-in</b><p>{{x.qr_token}}</p></div></div><br>
-    <div class="card"><h2>Últimos check-ins</h2>{% for c in checks %}<p>{{c.entrada}}</p>{% else %}<p class="muted">Nenhum.</p>{% endfor %}</div><br>
-    <div class="card"><h2>Pagamentos</h2>{% for p in pags %}<p>{{p.referencia}} · R$ {{'%.2f'|format(p.valor)}} · {{p.forma}}</p>{% else %}<p class="muted">Nenhum.</p>{% endfor %}</div>
+    <h1>{{x.nome}}</h1>
+
+    <p>
+      <span class="pill">
+        {{x.modalidade or 'Sem modalidade'}}
+      </span>
+      {{x.graduacao or ''}}
+    </p>
+
+    <div class="card">
+      <h2>👤 Dados do aluno</h2>
+
+      {% if x.foto %}
+      <div style="text-align:center;margin-bottom:20px">
+        <img src="/static/alunos/{{x.foto}}"
+             alt="Foto do aluno"
+             style="width:150px;height:150px;
+                    object-fit:cover;border-radius:18px;
+                    border:3px solid #e5e7eb">
+      </div>
+      {% endif %}
+
+      <div class="grid">
+
+        <div>
+          <b>Nome completo</b>
+          <p>{{x.nome or '-'}}</p>
+        </div>
+
+        <div>
+          <b>CPF/Documento</b>
+          <p>{{x.documento or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Data de nascimento</b>
+          <p>{{x.nascimento or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Telefone / WhatsApp</b>
+          <p>{{x.telefone or '-'}}</p>
+        </div>
+
+        <div>
+          <b>E-mail</b>
+          <p>{{x.email or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Modalidade</b>
+          <p>{{x.modalidade or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Graduação / Faixa</b>
+          <p>{{x.graduacao or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Responsável</b>
+          <p>{{x.responsavel or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Telefone do responsável</b>
+          <p>{{x.telefone_responsavel or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Endereço</b>
+          <p>{{x.endereco or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Contato de emergência</b>
+          <p>{{x.contato_emergencia or '-'}}</p>
+        </div>
+
+        <div>
+          <b>Telefone de emergência</b>
+          <p>{{x.telefone_emergencia or '-'}}</p>
+        </div>
+
+      </div>
+
+      <div style="margin-top:15px">
+        <b>Observações</b>
+        <p style="white-space:pre-wrap">
+          {{x.observacoes or '-'}}
+        </p>
+      </div>
+    </div>
+
+    <br>
+
+    <div class="card">
+      <h2>📱 QR/Token de check-in</h2>
+      <p style="font-size:20px;word-break:break-all">
+        {{x.qr_token or '-'}}
+      </p>
+    </div>
+
+    <br>
+
+    <div class="card">
+      <h2>Últimos check-ins</h2>
+
+      {% for c in checks %}
+        <p>{{c.entrada}}</p>
+      {% else %}
+        <p class="muted">Nenhum.</p>
+      {% endfor %}
+    </div>
+
+    <br>
+
+    <div class="card">
+      <h2>Pagamentos</h2>
+
+      {% for p in pags %}
+        <p>
+          {{p.referencia}} ·
+          R$ {{'%.2f'|format(p.valor)}} ·
+          {{p.forma}}
+        </p>
+      {% else %}
+        <p class="muted">Nenhum.</p>
+      {% endfor %}
+    </div>
 
     <br>
 
@@ -576,37 +717,44 @@ def aluno(id):
         {% if x.ativo %}
         <form method="post"
               action="/alunos/{{x.id}}/desativar"
-              onsubmit="return confirm('Deseja desativar este aluno%s O histórico será preservado.')">
+              onsubmit="return confirm('Deseja desativar este aluno? O histórico será preservado.')">
           <button type="submit" class="danger">
             🚫 Desativar aluno
           </button>
         </form>
+
         {% else %}
+
         <form method="post"
               action="/alunos/{{x.id}}/reativar"
-              onsubmit="return confirm('Deseja reativar este aluno%s')">
+              onsubmit="return confirm('Deseja reativar este aluno?')">
           <button type="submit" class="green">
             ✅ Reativar aluno
           </button>
         </form>
+
         {% endif %}
 
         <form method="post"
               action="/alunos/{{x.id}}/excluir"
-              onsubmit="return confirm('ATENÇÃO: isto apagará definitivamente o aluno e seus dados relacionados. Deseja continuar%s') && confirm('Última confirmação: excluir definitivamente {{x.nome}}%s')">
+              onsubmit="return confirm('ATENÇÃO: isto apagará definitivamente o aluno e seus dados relacionados. Deseja continuar?') && confirm('Última confirmação: excluir definitivamente {{x.nome}}?')">
+
           <button type="submit"
                   class="danger"
                   style="background:#7f1d1d!important">
             🗑️ Excluir definitivamente
           </button>
+
         </form>
 
       </div>
 
       <p class="muted" style="margin-bottom:0">
-        Desativar preserva o histórico. Excluir definitivamente remove também os registros relacionados ao aluno.
+        Desativar preserva o histórico.
+        Excluir definitivamente remove também os registros relacionados ao aluno.
       </p>
     </div>
+
     """,x=x,pags=pags,checks=checks)
 
 
