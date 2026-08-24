@@ -246,7 +246,7 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
   th:nth-child(n+4),td:nth-child(n+4){display:none}
 }
 </style></head><body>
-<div class="top"><div class="brand">TATAME<b>ONE</b></div><div>{{session.get('nome','')}}</div></div>
+<div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:52px;width:auto;max-width:190px;object-fit:contain;display:block"></div><div>{{session.get('nome','')}}</div></div>
 {% if session.get('uid') %}
 <div class="nav-wrap"><div class="nav">
 <a class="btn light" href="/"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
