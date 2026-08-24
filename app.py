@@ -467,24 +467,143 @@ def recusar_pre_cadastro(id):
 def aluno_novo():
     con=db()
     mods=con.execute("SELECT nome FROM modalidades WHERE academia_id=? AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
+
     if request.method=="POST":
         f=request.form
-        con.execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
-        telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",(aid(),f["nome"],f.get("documento"),f.get("nascimento"),f.get("telefone"),
-        f.get("email"),f.get("responsavel"),f.get("telefone_responsavel"),f.get("modalidade"),f.get("graduacao"),
-        f.get("observacoes"),secrets.token_hex(8),agora()))
-        con.commit(); con.close(); return redirect("/alunos")
+
+        foto_nome=None
+        foto=request.files.get("foto")
+        if foto and foto.filename:
+            ext=os.path.splitext(foto.filename)[1].lower()
+            if ext in (".jpg",".jpeg",".png",".webp"):
+                os.makedirs("static/alunos",exist_ok=True)
+                foto_nome=secrets.token_hex(12)+ext
+                foto.save(os.path.join("static/alunos",foto_nome))
+
+        con.execute("""INSERT INTO alunos(
+            academia_id,nome,documento,nascimento,telefone,email,
+            responsavel,telefone_responsavel,modalidade,graduacao,
+            observacoes,qr_token,criado_em,endereco,
+            contato_emergencia,telefone_emergencia,foto
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            aid(),
+            f["nome"],
+            f.get("documento"),
+            f.get("nascimento"),
+            f.get("telefone"),
+            f.get("email"),
+            f.get("responsavel"),
+            f.get("telefone_responsavel"),
+            f.get("modalidade"),
+            f.get("graduacao"),
+            f.get("observacoes"),
+            secrets.token_hex(8),
+            agora(),
+            f.get("endereco"),
+            f.get("contato_emergencia"),
+            f.get("telefone_emergencia"),
+            foto_nome
+        ))
+
+        con.commit()
+        con.close()
+        return redirect("/alunos")
+
     con.close()
+
     return page("Novo aluno","""
-    <h1>Novo aluno</h1><div class="card"><form method="post">
-    <div class="grid"><div><label>Nome completo</label><input name="nome" required></div><div><label>CPF/Documento</label><input name="documento"></div>
-    <div><label>Nascimento</label><input type="date" name="nascimento"></div><div><label>Telefone</label><input name="telefone"></div>
-    <div><label>E-mail</label><input type="email" name="email"></div><div><label>Modalidade</label><select name="modalidade">
-    <option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select></div>
-    <div><label>Graduação/Faixa</label><input name="graduacao"></div><div><label>Responsável</label><input name="responsavel"></div>
-    <div><label>Telefone responsável</label><input name="telefone_responsavel"></div></div>
-    <label>Observações</label><textarea name="observacoes"></textarea><button class="green">Salvar aluno</button></form></div>""",mods=mods)
+    <h1>Novo aluno</h1>
+
+    <div class="card">
+    <form method="post" enctype="multipart/form-data">
+
+    <label>📷 Foto do aluno</label>
+    <input type="file"
+           name="foto"
+           accept="image/jpeg,image/png,image/webp"
+           capture="user">
+
+    <div class="grid">
+
+      <div>
+        <label>Nome completo *</label>
+        <input name="nome" required>
+      </div>
+
+      <div>
+        <label>CPF/Documento</label>
+        <input name="documento">
+      </div>
+
+      <div>
+        <label>Data de nascimento</label>
+        <input type="date" name="nascimento">
+      </div>
+
+      <div>
+        <label>Telefone / WhatsApp</label>
+        <input name="telefone">
+      </div>
+
+      <div>
+        <label>E-mail</label>
+        <input type="email" name="email">
+      </div>
+
+      <div>
+        <label>Modalidade</label>
+        <select name="modalidade">
+          <option value="">Selecione</option>
+          {% for m in mods %}
+          <option>{{m.nome}}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Graduação / Faixa</label>
+        <input name="graduacao">
+      </div>
+
+      <div>
+        <label>Responsável</label>
+        <input name="responsavel">
+      </div>
+
+      <div>
+        <label>Telefone do responsável</label>
+        <input name="telefone_responsavel">
+      </div>
+
+    </div>
+
+    <label>Endereço</label>
+    <input name="endereco"
+           placeholder="Rua, número, bairro e cidade">
+
+    <div class="grid">
+
+      <div>
+        <label>Contato de emergência</label>
+        <input name="contato_emergencia">
+      </div>
+
+      <div>
+        <label>Telefone de emergência</label>
+        <input name="telefone_emergencia">
+      </div>
+
+    </div>
+
+    <label>Observações</label>
+    <textarea name="observacoes" rows="4"></textarea>
+
+    <button class="green">Salvar aluno</button>
+
+    </form>
+    </div>
+    """,mods=mods)
 
 @app.route("/alunos/<int:id>")
 @login_required
