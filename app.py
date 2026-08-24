@@ -448,7 +448,9 @@ def cadastro_publico(academia_id):
     <div><label>Responsável (se necessário)</label><input name="responsavel"></div>
     <div><label>Telefone do responsável</label><input name="telefone_responsavel"></div>
     <div><label>Contato de emergência</label><input name="contato_emergencia"></div>
-    <div><label>Telefone de emergência</label><input name="telefone_emergencia"></div></div>
+    <div><label>Telefone de emergência</label><input name="telefone_emergencia"
+               id="telefone_emergencia"
+               placeholder="Telefone"></div></div>
     <label>Observações</label><textarea name="observacoes" rows="4"></textarea>
     <button type="submit">Enviar cadastro</button></form></div>""",ac,mods=mods)
 
@@ -613,7 +615,15 @@ def aluno_novo():
 
       <div>
         <label>Graduação / Faixa</label>
-        <input name="graduacao">
+        <select name="graduacao" id="graduacao">
+          <option value="">Selecione</option>
+          <option value="Branca">⚪ Branca</option>
+          <option value="Azul">🔵 Azul</option>
+          <option value="Roxa">🟣 Roxa</option>
+          <option value="Marrom">🟤 Marrom</option>
+          <option value="Preta">⚫ Preta</option>
+          <option value="Não se aplica">Não se aplica</option>
+        </select>
       </div>
 
       <div>
@@ -636,7 +646,15 @@ def aluno_novo():
 
       <div>
         <label>Contato de emergência</label>
-        <input name="contato_emergencia">
+        <select name="contato_emergencia"
+                id="contato_emergencia"
+                onchange="preencherEmergencia(this.value)">
+          <option value="">Selecione</option>
+          <option value="SAMU">🚑 SAMU — 192</option>
+          <option value="Bombeiros">🚒 Bombeiros — 193</option>
+          <option value="Polícia Militar">🚓 Polícia Militar — 190</option>
+          <option value="Contato particular">👤 Contato particular</option>
+        </select>
       </div>
 
       <div>
@@ -648,6 +666,25 @@ def aluno_novo():
 
     <label>Observações</label>
     <textarea name="observacoes" rows="4"></textarea>
+
+    <script>
+function preencherEmergencia(tipo) {
+    const telefone = document.getElementById("telefone_emergencia");
+
+    const numeros = {
+        "SAMU": "192",
+        "Bombeiros": "193",
+        "Polícia Militar": "190"
+    };
+
+    if (numeros[tipo]) {
+        telefone.value = numeros[tipo];
+    } else if (tipo === "Contato particular") {
+        telefone.value = "";
+        telefone.focus();
+    }
+}
+</script>
 
     <button class="green">Salvar aluno</button>
 
