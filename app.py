@@ -249,7 +249,7 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
 <div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block"></div><div>{{session.get('nome','')}}</div></div>
 {% if session.get('uid') and request.path == '/' %}
 <div class="nav-wrap"><div class="nav">
-<a class="btn light" href="/"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
+<a class="btn light" href="/painel"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
 <a class="btn light" href="/alunos"><span class="nav-icon">👥</span><span class="nav-copy"><span class="nav-title">Alunos</span><span class="nav-desc">Cadastros e acompanhamento</span></span><span class="nav-arrow">›</span></a>
 <a class="btn light" href="/checkin"><span class="nav-icon">✅</span><span class="nav-copy"><span class="nav-title">Check-in</span><span class="nav-desc">Registrar entrada dos alunos</span></span><span class="nav-arrow">›</span></a>
 <a class="btn light" href="/planos"><span class="nav-icon">💳</span><span class="nav-copy"><span class="nav-title">Planos</span><span class="nav-desc">Planos e mensalidades</span></span><span class="nav-arrow">›</span></a>
@@ -317,6 +317,11 @@ def logout():
     return redirect("/login")
 
 @app.route("/")
+@login_required
+def inicio():
+    return page("Início", "")
+
+@app.route("/painel")
 @login_required
 def dashboard():
     con=db()
