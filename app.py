@@ -392,7 +392,9 @@ def cadastro_publico(academia_id):
     if request.method=="POST":
         f=request.form
         foto_nome=None
-        foto=request.files.get("foto")
+        foto=request.files.get("foto_camera")
+        if not foto or not foto.filename:
+            foto=request.files.get("foto")
         if foto and foto.filename:
             ext=os.path.splitext(foto.filename)[1].lower()
             if ext in (".jpg",".jpeg",".png",".webp"):
@@ -417,7 +419,22 @@ def cadastro_publico(academia_id):
     <div class="card"><h1>Cadastro de aluno</h1>
     <p class="muted">Preencha seus dados. Não é necessário instalar o aplicativo.</p>
     <form method="post" enctype="multipart/form-data">
-    <label>Foto do aluno</label><input type="file" name="foto" accept="image/jpeg,image/png,image/webp" capture="user">
+    <label>📷 Foto do aluno</label>
+<div class="grid">
+  <div>
+    <label>📸 Tirar foto</label>
+    <input type="file"
+           name="foto_camera"
+           accept="image/*"
+           capture="environment">
+  </div>
+  <div>
+    <label>🖼️ Escolher da galeria</label>
+    <input type="file"
+           name="foto"
+           accept="image/jpeg,image/png,image/webp">
+  </div>
+</div>
     <label>Nome completo *</label><input name="nome" required>
     <div class="grid">
     <div><label>CPF/Documento</label><input name="documento"></div>
@@ -472,7 +489,9 @@ def aluno_novo():
         f=request.form
 
         foto_nome=None
-        foto=request.files.get("foto")
+        foto=request.files.get("foto_camera")
+        if not foto or not foto.filename:
+            foto=request.files.get("foto")
         if foto and foto.filename:
             ext=os.path.splitext(foto.filename)[1].lower()
             if ext in (".jpg",".jpeg",".png",".webp"):
@@ -519,10 +538,21 @@ def aluno_novo():
     <form method="post" enctype="multipart/form-data">
 
     <label>📷 Foto do aluno</label>
-    <input type="file"
-           name="foto"
-           accept="image/jpeg,image/png,image/webp"
-           capture="user">
+    <div class="grid">
+      <div>
+        <label>📸 Tirar foto</label>
+        <input type="file"
+               name="foto_camera"
+               accept="image/*"
+               capture="environment">
+      </div>
+      <div>
+        <label>🖼️ Escolher da galeria</label>
+        <input type="file"
+               name="foto"
+               accept="image/jpeg,image/png,image/webp">
+      </div>
+    </div>
 
     <div class="grid">
 
