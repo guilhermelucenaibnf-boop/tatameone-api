@@ -670,7 +670,126 @@ def aluno(id):
     <div class="card"><b>QR/Token de check-in</b><p>{{x.qr_token}}</p></div></div><br>
     <div class="card"><h2>Últimos check-ins</h2>{% for c in checks %}<p>{{c.entrada}}</p>{% else %}<p class="muted">Nenhum.</p>{% endfor %}</div><br>
     <div class="card"><h2>Pagamentos</h2>{% for p in pags %}<p>{{p.referencia}} · R$ {{'%.2f'|format(p.valor)}} · {{p.forma}}</p>{% else %}<p class="muted">Nenhum.</p>{% endfor %}</div>
+
+    <br>
+
+    <div class="card">
+      <h2>Gerenciar aluno</h2>
+
+      <div class="actions">
+
+        {% if x.ativo %}
+        <form method="post"
+              action="/alunos/{{x.id}}/desativar"
+              onsubmit="return confirm('Deseja desativar este aluno? O histórico será preservado.')">
+          <button type="submit" class="danger">
+            🚫 Desativar aluno
+          </button>
+        </form>
+        {% else %}
+        <form method="post"
+              action="/alunos/{{x.id}}/reativar"
+              onsubmit="return confirm('Deseja reativar este aluno?')">
+          <button type="submit" class="green">
+            ✅ Reativar aluno
+          </button>
+        </form>
+        {% endif %}
+
+        <form method="post"
+              action="/alunos/{{x.id}}/excluir"
+              onsubmit="return confirm('ATENÇÃO: isto apagará definitivamente o aluno e seus dados relacionados. Deseja continuar?') && confirm('Última confirmação: excluir definitivamente {{x.nome}}?')">
+          <button type="submit"
+                  class="danger"
+                  style="background:#7f1d1d!important">
+            🗑️ Excluir definitivamente
+          </button>
+        </form>
+
+      </div>
+
+      <p class="muted" style="margin-bottom:0">
+        Desativar preserva o histórico. Excluir definitivamente remove também os registros relacionados ao aluno.
+      </p>
+    </div>
     """,x=x,pags=pags,checks=checks)
+
+
+@app.route("/alunos/<int:id>/desativar", methods=["POST"])
+@login_required
+def aluno_desativar(id):
+    con=db()
+    con.execute(
+        "UPDATE alunos SET ativo=0 WHERE id=? AND academia_id=?",
+        (id,aid())
+    )
+    con.commit()
+    con.close()
+    return redirect("/alunos/"+str(id))
+
+
+@app.route("/alunos/<int:id>/reativar", methods=["POST"])
+@login_required
+def aluno_reativar(id):
+    con=db()
+    con.execute(
+        "UPDATE alunos SET ativo=1 WHERE id=? AND academia_id=?",
+        (id,aid())
+    )
+    con.commit()
+    con.close()
+    return redirect("/alunos/"+str(id))
+
+
+@app.route("/alunos/<int:id>/excluir", methods=["POST"])
+@login_required
+def aluno_excluir(id):
+    con=db()
+
+    aluno=con.execute(
+        "SELECT * FROM alunos WHERE id=? AND academia_id=?",
+        (id,aid())
+    ).fetchone()
+
+    if not aluno:
+        con.close()
+        return "Aluno não encontrado",404
+
+    # Remove somente dados pertencentes ao aluno
+    # dentro da academia atualmente autenticada.
+    for tabela in (
+        "checkins",
+        "pagamentos",
+        "avaliacoes",
+        "treinos",
+        "matriculas"
+    ):
+        con.execute(
+            f"DELETE FROM {tabela} WHERE aluno_id=? AND academia_id=?",
+            (id,aid())
+        )
+
+    # Remove a foto armazenada, quando existir.
+    foto=aluno["foto"] if "foto" in aluno.keys() else None
+
+    con.execute(
+        "DELETE FROM alunos WHERE id=? AND academia_id=?",
+        (id,aid())
+    )
+
+    con.commit()
+    con.close()
+
+    if foto:
+        caminho=os.path.join("static","alunos",foto)
+        try:
+            if os.path.isfile(caminho):
+                os.remove(caminho)
+        except OSError:
+            pass
+
+    return redirect("/alunos")
+
 
 @app.route("/checkin", methods=["GET","POST"])
 @login_required
