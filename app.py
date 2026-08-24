@@ -230,8 +230,13 @@ def alunos():
     {% endfor %}</div>
     {% endif %}
     <div style="overflow:auto"><table><tr><th>Nome</th><th>Modalidade</th><th>Telefone</th><th>Status</th><th>Ação</th></tr>
-    {% for x in rows %}<tr><td><b>{{x.nome}}</b></td><td>{{x.modalidade or '-'}}</td><td>{{x.telefone or '-'}}</td>
-    <td><span class="pill">{{'ATIVO' if x.ativo else 'INATIVO'}}</span></td><td><a href="/alunos/{{x.id}}">Abrir</a></td></tr>{% endfor %}
+    {% for x in rows %}<tr>
+    <td><a href="/alunos/{{x.id}}" style="color:inherit;text-decoration:none;display:block"><b>{{x.nome}}</b></a></td>
+    <td>{{x.modalidade or '-'}}</td>
+    <td>{{x.telefone or '-'}}</td>
+    <td><span class="pill">{{'ATIVO' if x.ativo else 'INATIVO'}}</span></td>
+    <td><a class="btn" href="/alunos/{{x.id}}">Abrir</a></td>
+    </tr>{% endfor %}
     </table></div>""",rows=rows,pendentes=pendentes,link_publico=link_publico)
 
 @app.route("/cadastro/<int:academia_id>", methods=["GET","POST"])
