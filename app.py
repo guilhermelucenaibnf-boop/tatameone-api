@@ -156,6 +156,22 @@ def init_db():
       mensagem TEXT NOT NULL,
       criado_em TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS pre_cadastros(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      academia_id INTEGER NOT NULL,
+      nome TEXT NOT NULL,
+      documento TEXT,
+      nascimento TEXT,
+      telefone TEXT,
+      email TEXT,
+      responsavel TEXT,
+      telefone_responsavel TEXT,
+      modalidade TEXT,
+      graduacao TEXT,
+      observacoes TEXT,
+      status TEXT DEFAULT 'PENDENTE',
+      criado_em TEXT NOT NULL
+    );
     """)
     # instalação inicial
     if cur.execute("SELECT COUNT(*) n FROM academias").fetchone()["n"] == 0:
@@ -295,13 +311,107 @@ def dashboard():
 @app.route("/alunos")
 @login_required
 def alunos():
-    con=db(); rows=con.execute("SELECT * FROM alunos WHERE academia_id=? ORDER BY nome",(aid(),)).fetchall(); con.close()
+    con=db()
+    rows=con.execute("SELECT * FROM alunos WHERE academia_id=? ORDER BY nome",(aid(),)).fetchall()
+    pendentes=con.execute("SELECT * FROM pre_cadastros WHERE academia_id=? AND status='PENDENTE' ORDER BY id DESC",(aid(),)).fetchall()
+    con.close()
+    link_publico=request.url_root.rstrip("/")+"/cadastro/"+str(aid())
     return page("Alunos","""
     <div class="actions"><h1 style="flex:1">Alunos</h1><a class="btn green" href="/alunos/novo">+ Novo aluno</a></div>
+    <div class="card" style="margin:12px 0 18px">
+      <h2>🔗 Cadastro do aluno em casa</h2>
+      <p class="muted">O aluno pode preencher pelo navegador, sem instalar o aplicativo.</p>
+      <input id="linkCadastro" readonly value="{{link_publico}}">
+      <div class="actions">
+        <button type="button" class="green" onclick="navigator.clipboard.writeText(document.getElementById('linkCadastro').value);this.innerText='✓ Link copiado'">Copiar link</button>
+        <a class="btn" target="_blank" href="{{link_publico}}">Abrir formulário</a>
+      </div>
+    </div>
+    {% if pendentes %}
+    <div class="card" style="margin-bottom:18px"><h2>Cadastros aguardando aprovação</h2>
+    {% for p in pendentes %}
+      <div style="padding:14px 0;border-bottom:1px solid #eee">
+        <b>{{p.nome}}</b><br><span class="muted">{{p.modalidade or 'Sem modalidade'}} · {{p.telefone or 'Sem telefone'}}</span>
+        <div class="actions" style="margin-top:9px">
+          <a class="btn green" href="/alunos/pre-cadastro/{{p.id}}/aprovar">✓ Aprovar</a>
+          <a class="btn danger" href="/alunos/pre-cadastro/{{p.id}}/recusar">Recusar</a>
+        </div>
+      </div>
+    {% endfor %}</div>
+    {% endif %}
     <div style="overflow:auto"><table><tr><th>Nome</th><th>Modalidade</th><th>Telefone</th><th>Status</th><th>Ação</th></tr>
     {% for x in rows %}<tr><td><b>{{x.nome}}</b></td><td>{{x.modalidade or '-'}}</td><td>{{x.telefone or '-'}}</td>
     <td><span class="pill">{{'ATIVO' if x.ativo else 'INATIVO'}}</span></td><td><a href="/alunos/{{x.id}}">Abrir</a></td></tr>{% endfor %}
-    </table></div>""",rows=rows)
+    </table></div>""",rows=rows,pendentes=pendentes,link_publico=link_publico)
+
+@app.route("/cadastro/<int:academia_id>", methods=["GET","POST"])
+def cadastro_publico(academia_id):
+    con=db()
+    ac=con.execute("SELECT * FROM academias WHERE id=? AND ativo=1",(academia_id,)).fetchone()
+    if not ac:
+        con.close()
+        return "Academia não encontrada.",404
+    mods=con.execute("SELECT nome FROM modalidades WHERE academia_id=? AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
+    if request.method=="POST":
+        f=request.form
+        con.execute("""INSERT INTO pre_cadastros(academia_id,nome,documento,nascimento,telefone,email,
+        responsavel,telefone_responsavel,modalidade,graduacao,observacoes,status,criado_em)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,'PENDENTE',?)""",
+        (academia_id,f["nome"],f.get("documento"),f.get("nascimento"),f.get("telefone"),f.get("email"),
+         f.get("responsavel"),f.get("telefone_responsavel"),f.get("modalidade"),f.get("graduacao"),
+         f.get("observacoes"),agora()))
+        con.commit()
+        con.close()
+        return page("Cadastro enviado","""
+        <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+        <div style="font-size:64px">✅</div><h1>Cadastro enviado!</h1>
+        <p>Seus dados foram enviados para <b>{{nome_academia}}</b>.</p>
+        <p class="muted">A academia fará a análise antes de ativar seu cadastro.</p></div>""",nome_academia=ac["nome"])
+    con.close()
+    return page("Cadastro de aluno","""
+    <div class="card" style="max-width:720px;margin:3vh auto">
+    <h1>Cadastro de aluno</h1>
+    <p class="muted">{{nome_academia}} · Preencha seus dados. Não é necessário instalar o aplicativo.</p>
+    <form method="post">
+    <label>Nome completo *</label><input name="nome" required>
+    <div class="grid">
+      <div><label>CPF/Documento</label><input name="documento"></div>
+      <div><label>Data de nascimento</label><input type="date" name="nascimento"></div>
+      <div><label>Telefone *</label><input name="telefone" required></div>
+      <div><label>E-mail</label><input type="email" name="email"></div>
+      <div><label>Modalidade desejada</label><select name="modalidade"><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select></div>
+      <div><label>Graduação/Faixa</label><input name="graduacao"></div>
+      <div><label>Responsável (se necessário)</label><input name="responsavel"></div>
+      <div><label>Telefone do responsável</label><input name="telefone_responsavel"></div>
+    </div>
+    <label>Observações</label><textarea name="observacoes"></textarea>
+    <button class="green" style="width:100%;font-size:18px;padding:15px">Enviar cadastro</button>
+    </form></div>""",nome_academia=ac["nome"],mods=mods)
+
+@app.route("/alunos/pre-cadastro/<int:id>/aprovar")
+@login_required
+def aprovar_pre_cadastro(id):
+    con=db()
+    p=con.execute("SELECT * FROM pre_cadastros WHERE id=? AND academia_id=? AND status='PENDENTE'",(id,aid())).fetchone()
+    if p:
+        con.execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
+        telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (aid(),p["nome"],p["documento"],p["nascimento"],p["telefone"],p["email"],p["responsavel"],
+         p["telefone_responsavel"],p["modalidade"],p["graduacao"],p["observacoes"],secrets.token_hex(8),agora()))
+        con.execute("UPDATE pre_cadastros SET status='APROVADO' WHERE id=?",(id,))
+        con.commit()
+    con.close()
+    return redirect("/alunos")
+
+@app.route("/alunos/pre-cadastro/<int:id>/recusar")
+@login_required
+def recusar_pre_cadastro(id):
+    con=db()
+    con.execute("UPDATE pre_cadastros SET status='RECUSADO' WHERE id=? AND academia_id=?",(id,aid()))
+    con.commit()
+    con.close()
+    return redirect("/alunos")
 
 @app.route("/alunos/novo", methods=["GET","POST"])
 @login_required
