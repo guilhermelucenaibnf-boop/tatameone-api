@@ -247,7 +247,7 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
 }
 </style></head><body>
 <div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block"></div><div>{{session.get('nome','')}}</div></div>
-{% if session.get('uid') %}
+{% if session.get('uid') and request.path == '/' %}
 <div class="nav-wrap"><div class="nav">
 <a class="btn light" href="/"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
 <a class="btn light" href="/alunos"><span class="nav-icon">👥</span><span class="nav-copy"><span class="nav-title">Alunos</span><span class="nav-desc">Cadastros e acompanhamento</span></span><span class="nav-arrow">›</span></a>
@@ -259,6 +259,11 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
 <a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>
 <a class="btn danger" href="/logout"><span class="nav-icon">🚪</span><span class="nav-copy"><span class="nav-title">Sair</span><span class="nav-desc">Encerrar sessão</span></span><span class="nav-arrow">›</span></a>
 </div></div>
+{% endif %}
+{% if session.get('uid') and request.path != '/' %}
+<div style="max-width:1150px;margin:14px auto 0;padding:0 18px">
+<a href="/" style="display:inline-flex;align-items:center;gap:8px;background:#111827;color:white;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">← Voltar ao Painel</a>
+</div>
 {% endif %}
 <div class="wrap">{{body|safe}}</div></body></html>
 """
