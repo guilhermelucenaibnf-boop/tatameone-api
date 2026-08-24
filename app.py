@@ -1,5 +1,6 @@
 import os
-import sqlite3
+import psycopg
+from psycopg.rows import dict_row
 import secrets
 from datetime import datetime
 from functools import wraps
@@ -7,193 +8,45 @@ from flask import Flask, request, redirect, url_for, session, render_template_st
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tatameone-2-troque-em-producao")
-DB = os.environ.get("TATAMEONE_DB", "tatameone.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def db():
-    con = sqlite3.connect(DB)
-    con.row_factory = sqlite3.Row
-    return con
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL não configurada no Render.")
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 def agora():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def init_db():
-    con = db()
-    cur = con.cursor()
-    cur.executescript("""
-    CREATE TABLE IF NOT EXISTS academias(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      documento TEXT,
-      telefone TEXT,
-      endereco TEXT,
-      logo TEXT,
-      cor TEXT DEFAULT '#111827',
-      plano TEXT DEFAULT 'GRATUITO',
-      ativo INTEGER DEFAULT 1,
-      criado_em TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS usuarios(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER,
-      nome TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      senha TEXT NOT NULL,
-      perfil TEXT NOT NULL DEFAULT 'ADMIN',
-      ativo INTEGER DEFAULT 1,
-      criado_em TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS modalidades(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      nome TEXT NOT NULL,
-      ativo INTEGER DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS alunos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      nome TEXT NOT NULL,
-      documento TEXT,
-      nascimento TEXT,
-      telefone TEXT,
-      email TEXT,
-      responsavel TEXT,
-      telefone_responsavel TEXT,
-      modalidade TEXT,
-      graduacao TEXT,
-      observacoes TEXT,
-      qr_token TEXT UNIQUE,
-      ativo INTEGER DEFAULT 1,
-      criado_em TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS planos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      nome TEXT NOT NULL,
-      valor REAL DEFAULT 0,
-      periodicidade TEXT DEFAULT 'MENSAL',
-      descricao TEXT,
-      ativo INTEGER DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS matriculas(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      aluno_id INTEGER NOT NULL,
-      plano_id INTEGER,
-      inicio TEXT,
-      vencimento_dia INTEGER DEFAULT 10,
-      valor REAL DEFAULT 0,
-      status TEXT DEFAULT 'ATIVA'
-    );
-    CREATE TABLE IF NOT EXISTS pagamentos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      aluno_id INTEGER NOT NULL,
-      referencia TEXT,
-      valor REAL NOT NULL,
-      forma TEXT DEFAULT 'PIX',
-      status TEXT DEFAULT 'PAGO',
-      pago_em TEXT
-    );
-    CREATE TABLE IF NOT EXISTS checkins(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      aluno_id INTEGER NOT NULL,
-      entrada TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS professores(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      nome TEXT NOT NULL,
-      telefone TEXT,
-      email TEXT,
-      especialidade TEXT,
-      ativo INTEGER DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS aulas(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      modalidade TEXT NOT NULL,
-      professor TEXT,
-      dia TEXT,
-      horario TEXT,
-      capacidade INTEGER DEFAULT 20,
-      ativo INTEGER DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS avaliacoes(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      aluno_id INTEGER NOT NULL,
-      data TEXT NOT NULL,
-      peso REAL,
-      altura REAL,
-      gordura REAL,
-      cintura REAL,
-      braco REAL,
-      observacoes TEXT
-    );
-    CREATE TABLE IF NOT EXISTS treinos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      aluno_id INTEGER NOT NULL,
-      titulo TEXT NOT NULL,
-      descricao TEXT,
-      criado_em TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS caixa(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      tipo TEXT NOT NULL,
-      descricao TEXT,
-      valor REAL NOT NULL,
-      forma TEXT,
-      data TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS avisos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      titulo TEXT NOT NULL,
-      mensagem TEXT NOT NULL,
-      criado_em TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS pre_cadastros(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      academia_id INTEGER NOT NULL,
-      nome TEXT NOT NULL,
-      documento TEXT,
-      nascimento TEXT,
-      telefone TEXT,
-      email TEXT,
-      responsavel TEXT,
-      telefone_responsavel TEXT,
-      modalidade TEXT,
-      graduacao TEXT,
-      observacoes TEXT,
-      status TEXT DEFAULT 'PENDENTE',
-      criado_em TEXT NOT NULL
-    );
-    """)
-    # instalação inicial
-    if cur.execute("SELECT COUNT(*) n FROM academias").fetchone()["n"] == 0:
-        cur.execute("INSERT INTO academias(nome,plano,criado_em) VALUES(?,?,?)",
-                    ("TatameOne Demonstração","PREMIUM",agora()))
-        aid = cur.lastrowid
-        cur.execute("""INSERT INTO usuarios(academia_id,nome,email,senha,perfil,criado_em)
-                       VALUES(?,?,?,?,?,?)""",
-                    (aid,"Administrador","admin@tatameone.local","1234","DONO",agora()))
-        for m in ("Musculação","Jiu-Jítsu","Muay Thai","Boxe","Funcional","Cross Training",
-                  "Pilates","Yoga","Dança","Natação","Personal"):
-            cur.execute("INSERT INTO modalidades(academia_id,nome) VALUES(?,?)",(aid,m))
-        cur.execute("""INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao)
-                       VALUES(?,?,?,?,?)""",(aid,"Plano Gratuito",0,"MENSAL","Plano sem cobrança"))
-    # Migrações seguras: preservam o banco existente.
-    for tabela, coluna in (
-        ("alunos","endereco"),("alunos","contato_emergencia"),("alunos","telefone_emergencia"),("alunos","foto"),
-        ("pre_cadastros","endereco"),("pre_cadastros","contato_emergencia"),("pre_cadastros","telefone_emergencia"),("pre_cadastros","foto")
-    ):
-        existentes=[r[1] for r in cur.execute(f"PRAGMA table_info({tabela})").fetchall()]
-        if coluna not in existentes:
-            cur.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} TEXT")
+    con=db()
+    cur=con.cursor()
+    comandos=[
+"""CREATE TABLE IF NOT EXISTS academias(id BIGSERIAL PRIMARY KEY,nome TEXT NOT NULL,documento TEXT,telefone TEXT,endereco TEXT,logo TEXT,cor TEXT DEFAULT '#111827',plano TEXT DEFAULT 'GRATUITO',ativo INTEGER DEFAULT 1,criado_em TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS usuarios(id BIGSERIAL PRIMARY KEY,academia_id BIGINT,nome TEXT NOT NULL,email TEXT UNIQUE NOT NULL,senha TEXT NOT NULL,perfil TEXT NOT NULL DEFAULT 'ADMIN',ativo INTEGER DEFAULT 1,criado_em TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS modalidades(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,ativo INTEGER DEFAULT 1)""",
+"""CREATE TABLE IF NOT EXISTS alunos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,documento TEXT,nascimento TEXT,telefone TEXT,email TEXT,responsavel TEXT,telefone_responsavel TEXT,modalidade TEXT,graduacao TEXT,observacoes TEXT,qr_token TEXT UNIQUE,ativo INTEGER DEFAULT 1,criado_em TEXT NOT NULL,endereco TEXT,contato_emergencia TEXT,telefone_emergencia TEXT,foto TEXT)""",
+"""CREATE TABLE IF NOT EXISTS planos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,valor DOUBLE PRECISION DEFAULT 0,periodicidade TEXT DEFAULT 'MENSAL',descricao TEXT,ativo INTEGER DEFAULT 1)""",
+"""CREATE TABLE IF NOT EXISTS matriculas(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,plano_id BIGINT,inicio TEXT,vencimento_dia INTEGER DEFAULT 10,valor DOUBLE PRECISION DEFAULT 0,status TEXT DEFAULT 'ATIVA')""",
+"""CREATE TABLE IF NOT EXISTS pagamentos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,referencia TEXT,valor DOUBLE PRECISION NOT NULL,forma TEXT DEFAULT 'PIX',status TEXT DEFAULT 'PAGO',pago_em TEXT)""",
+"""CREATE TABLE IF NOT EXISTS checkins(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,entrada TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS professores(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,telefone TEXT,email TEXT,especialidade TEXT,ativo INTEGER DEFAULT 1)""",
+"""CREATE TABLE IF NOT EXISTS aulas(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,modalidade TEXT NOT NULL,professor TEXT,dia TEXT,horario TEXT,capacidade INTEGER DEFAULT 20,ativo INTEGER DEFAULT 1)""",
+"""CREATE TABLE IF NOT EXISTS avaliacoes(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,data TEXT NOT NULL,peso DOUBLE PRECISION,altura DOUBLE PRECISION,gordura DOUBLE PRECISION,cintura DOUBLE PRECISION,braco DOUBLE PRECISION,observacoes TEXT)""",
+"""CREATE TABLE IF NOT EXISTS treinos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,titulo TEXT NOT NULL,descricao TEXT,criado_em TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS caixa(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,tipo TEXT NOT NULL,descricao TEXT,valor DOUBLE PRECISION NOT NULL,forma TEXT,data TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS avisos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,titulo TEXT NOT NULL,mensagem TEXT NOT NULL,criado_em TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS pre_cadastros(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,documento TEXT,nascimento TEXT,telefone TEXT,email TEXT,responsavel TEXT,telefone_responsavel TEXT,modalidade TEXT,graduacao TEXT,observacoes TEXT,status TEXT DEFAULT 'PENDENTE',criado_em TEXT NOT NULL,endereco TEXT,contato_emergencia TEXT,telefone_emergencia TEXT,foto TEXT)"""
+    ]
+    for sql in comandos: cur.execute(sql)
+    cur.execute("SELECT COUNT(*) AS n FROM academias")
+    if cur.fetchone()["n"]==0:
+        cur.execute("INSERT INTO academias(nome,plano,criado_em) VALUES(%s,%s,%s) RETURNING id",("TatameOne Demonstração","PREMIUM",agora()))
+        academia_inicial=cur.fetchone()["id"]
+        cur.execute("INSERT INTO usuarios(academia_id,nome,email,senha,perfil,criado_em) VALUES(%s,%s,%s,%s,%s,%s)",(academia_inicial,"Administrador","admin@tatameone.local","1234","DONO",agora()))
+        for m in ("Musculação","Jiu-Jítsu","Muay Thai","Boxe","Funcional","Cross Training","Pilates","Yoga","Dança","Natação","Personal"):
+            cur.execute("INSERT INTO modalidades(academia_id,nome) VALUES(%s,%s)",(academia_inicial,m))
+        cur.execute("INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao) VALUES(%s,%s,%s,%s,%s)",(academia_inicial,"Plano Gratuito",0,"MENSAL","Plano sem cobrança"))
     con.commit()
     con.close()
 
@@ -296,7 +149,7 @@ def login():
     erro=""
     if request.method=="POST":
         con=db()
-        u=con.execute("SELECT * FROM usuarios WHERE lower(email)=lower(?) AND senha=? AND ativo=1",
+        u=con.cursor().execute("SELECT * FROM usuarios WHERE lower(email)=lower(%s) AND senha=%s AND ativo=1",
                       (request.form["email"].strip(),request.form["senha"])).fetchone()
         con.close()
         if u:
@@ -326,12 +179,12 @@ def inicio():
 def dashboard():
     con=db()
     stats={
-      "alunos":con.execute("SELECT COUNT(*) n FROM alunos WHERE academia_id=? AND ativo=1",(aid(),)).fetchone()["n"],
-      "checkins":con.execute("SELECT COUNT(*) n FROM checkins WHERE academia_id=? AND date(entrada)=date('now','localtime')",(aid(),)).fetchone()["n"],
-      "receita":con.execute("SELECT COALESCE(SUM(valor),0) n FROM pagamentos WHERE academia_id=? AND status='PAGO'",(aid(),)).fetchone()["n"],
-      "aulas":con.execute("SELECT COUNT(*) n FROM aulas WHERE academia_id=? AND ativo=1",(aid(),)).fetchone()["n"]
+      "alunos":con.cursor().execute("SELECT COUNT(*) n FROM alunos WHERE academia_id=%s AND ativo=1",(aid(),)).fetchone()["n"],
+      "checkins":con.cursor().execute("SELECT COUNT(*) n FROM checkins WHERE academia_id=%s AND date(entrada)=CURRENT_DATE",(aid(),)).fetchone()["n"],
+      "receita":con.cursor().execute("SELECT COALESCE(SUM(valor),0) n FROM pagamentos WHERE academia_id=%s AND status='PAGO'",(aid(),)).fetchone()["n"],
+      "aulas":con.cursor().execute("SELECT COUNT(*) n FROM aulas WHERE academia_id=%s AND ativo=1",(aid(),)).fetchone()["n"]
     }
-    ac=con.execute("SELECT * FROM academias WHERE id=?",(aid(),)).fetchone()
+    ac=con.cursor().execute("SELECT * FROM academias WHERE id=%s",(aid(),)).fetchone()
     con.close()
     return page("Painel","""
     <h1>{{ac.nome}}</h1><p class="muted">Visão geral da academia · Plano {{ac.plano}}</p>
@@ -349,8 +202,8 @@ def dashboard():
 @login_required
 def alunos():
     con=db()
-    rows=con.execute("SELECT * FROM alunos WHERE academia_id=? ORDER BY nome",(aid(),)).fetchall()
-    pendentes=con.execute("SELECT * FROM pre_cadastros WHERE academia_id=? AND status='PENDENTE' ORDER BY id DESC",(aid(),)).fetchall()
+    rows=con.cursor().execute("SELECT * FROM alunos WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
+    pendentes=con.cursor().execute("SELECT * FROM pre_cadastros WHERE academia_id=%s AND status='PENDENTE' ORDER BY id DESC",(aid(),)).fetchall()
     con.close()
     link_publico=request.url_root.rstrip("/")+"/cadastro/"+str(aid())
     return page("Alunos","""
@@ -384,11 +237,11 @@ def alunos():
 @app.route("/cadastro/<int:academia_id>", methods=["GET","POST"])
 def cadastro_publico(academia_id):
     con=db()
-    ac=con.execute("SELECT * FROM academias WHERE id=? AND ativo=1",(academia_id,)).fetchone()
+    ac=con.cursor().execute("SELECT * FROM academias WHERE id=%s AND ativo=1",(academia_id,)).fetchone()
     if not ac:
         con.close()
         return "Academia não encontrada.",404
-    mods=con.execute("SELECT nome FROM modalidades WHERE academia_id=? AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
+    mods=con.cursor().execute("SELECT nome FROM modalidades WHERE academia_id=%s AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
     if request.method=="POST":
         f=request.form
         foto_nome=None
@@ -401,10 +254,10 @@ def cadastro_publico(academia_id):
                 os.makedirs("static/alunos",exist_ok=True)
                 foto_nome=secrets.token_hex(12)+ext
                 foto.save(os.path.join("static/alunos",foto_nome))
-        con.execute("""INSERT INTO pre_cadastros(
+        con.cursor().execute("""INSERT INTO pre_cadastros(
         academia_id,nome,documento,nascimento,telefone,email,responsavel,telefone_responsavel,
         modalidade,graduacao,observacoes,status,criado_em,endereco,contato_emergencia,telefone_emergencia,foto)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,'PENDENTE',?,?,?,?,?)""",
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDENTE',%s,%s,%s,%s,%s)""",
         (academia_id,f["nome"],f.get("documento"),f.get("nascimento"),f.get("telefone"),f.get("email"),
          f.get("responsavel"),f.get("telefone_responsavel"),f.get("modalidade"),f.get("graduacao"),
          f.get("observacoes"),agora(),f.get("endereco"),f.get("contato_emergencia"),f.get("telefone_emergencia"),foto_nome))
@@ -458,16 +311,16 @@ def cadastro_publico(academia_id):
 @login_required
 def aprovar_pre_cadastro(id):
     con=db()
-    p=con.execute("SELECT * FROM pre_cadastros WHERE id=? AND academia_id=? AND status='PENDENTE'",(id,aid())).fetchone()
+    p=con.cursor().execute("SELECT * FROM pre_cadastros WHERE id=%s AND academia_id=%s AND status='PENDENTE'",(id,aid())).fetchone()
     if p:
-        con.execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
+        con.cursor().execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
         telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em,endereco,
         contato_emergencia,telefone_emergencia,foto)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (aid(),p["nome"],p["documento"],p["nascimento"],p["telefone"],p["email"],p["responsavel"],
          p["telefone_responsavel"],p["modalidade"],p["graduacao"],p["observacoes"],secrets.token_hex(8),agora(),
          p["endereco"],p["contato_emergencia"],p["telefone_emergencia"],p["foto"]))
-        con.execute("UPDATE pre_cadastros SET status='APROVADO' WHERE id=?",(id,))
+        con.cursor().execute("UPDATE pre_cadastros SET status='APROVADO' WHERE id=%s",(id,))
         con.commit()
     con.close()
     return redirect("/alunos")
@@ -476,7 +329,7 @@ def aprovar_pre_cadastro(id):
 @login_required
 def recusar_pre_cadastro(id):
     con=db()
-    con.execute("UPDATE pre_cadastros SET status='RECUSADO' WHERE id=? AND academia_id=?",(id,aid()))
+    con.cursor().execute("UPDATE pre_cadastros SET status='RECUSADO' WHERE id=%s AND academia_id=%s",(id,aid()))
     con.commit()
     con.close()
     return redirect("/alunos")
@@ -485,7 +338,7 @@ def recusar_pre_cadastro(id):
 @login_required
 def aluno_novo():
     con=db()
-    mods=con.execute("SELECT nome FROM modalidades WHERE academia_id=? AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
+    mods=con.cursor().execute("SELECT nome FROM modalidades WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
 
     if request.method=="POST":
         f=request.form
@@ -501,12 +354,12 @@ def aluno_novo():
                 foto_nome=secrets.token_hex(12)+ext
                 foto.save(os.path.join("static/alunos",foto_nome))
 
-        con.execute("""INSERT INTO alunos(
+        con.cursor().execute("""INSERT INTO alunos(
             academia_id,nome,documento,nascimento,telefone,email,
             responsavel,telefone_responsavel,modalidade,graduacao,
             observacoes,qr_token,criado_em,endereco,
             contato_emergencia,telefone_emergencia,foto
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (
             aid(),
             f["nome"],
@@ -554,7 +407,7 @@ def aluno_novo():
                accept="image/*"
                capture="environment"
                style="display:none"
-               onchange="document.getElementById('statusCamera').innerText=this.files.length ? '✓ Foto tirada' : ''">
+               onchange="document.getElementById('statusCamera').innerText=this.files.length %s '✓ Foto tirada' : ''">
         <div id="statusCamera"
              style="margin-top:8px;color:#16a34a;font-weight:700"></div>
       </div>
@@ -570,7 +423,7 @@ def aluno_novo():
                name="foto"
                accept="image/jpeg,image/png,image/webp"
                style="display:none"
-               onchange="document.getElementById('statusGaleria').innerText=this.files.length ? '✓ Foto selecionada' : ''">
+               onchange="document.getElementById('statusGaleria').innerText=this.files.length %s '✓ Foto selecionada' : ''">
         <div id="statusGaleria"
              style="margin-top:8px;color:#16a34a;font-weight:700"></div>
       </div>
@@ -696,9 +549,9 @@ function preencherEmergencia(tipo) {
 @login_required
 def aluno(id):
     con=db()
-    x=con.execute("SELECT * FROM alunos WHERE id=? AND academia_id=?",(id,aid())).fetchone()
-    pags=con.execute("SELECT * FROM pagamentos WHERE aluno_id=? AND academia_id=? ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
-    checks=con.execute("SELECT * FROM checkins WHERE aluno_id=? AND academia_id=? ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
+    x=con.cursor().execute("SELECT * FROM alunos WHERE id=%s AND academia_id=%s",(id,aid())).fetchone()
+    pags=con.cursor().execute("SELECT * FROM pagamentos WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
+    checks=con.cursor().execute("SELECT * FROM checkins WHERE aluno_id=%s AND academia_id=%s ORDER BY id DESC LIMIT 10",(id,aid())).fetchall()
     con.close()
     if not x:return "Aluno não encontrado",404
     return page(x["nome"],"""
@@ -718,7 +571,7 @@ def aluno(id):
         {% if x.ativo %}
         <form method="post"
               action="/alunos/{{x.id}}/desativar"
-              onsubmit="return confirm('Deseja desativar este aluno? O histórico será preservado.')">
+              onsubmit="return confirm('Deseja desativar este aluno%s O histórico será preservado.')">
           <button type="submit" class="danger">
             🚫 Desativar aluno
           </button>
@@ -726,7 +579,7 @@ def aluno(id):
         {% else %}
         <form method="post"
               action="/alunos/{{x.id}}/reativar"
-              onsubmit="return confirm('Deseja reativar este aluno?')">
+              onsubmit="return confirm('Deseja reativar este aluno%s')">
           <button type="submit" class="green">
             ✅ Reativar aluno
           </button>
@@ -735,7 +588,7 @@ def aluno(id):
 
         <form method="post"
               action="/alunos/{{x.id}}/excluir"
-              onsubmit="return confirm('ATENÇÃO: isto apagará definitivamente o aluno e seus dados relacionados. Deseja continuar?') && confirm('Última confirmação: excluir definitivamente {{x.nome}}?')">
+              onsubmit="return confirm('ATENÇÃO: isto apagará definitivamente o aluno e seus dados relacionados. Deseja continuar%s') && confirm('Última confirmação: excluir definitivamente {{x.nome}}%s')">
           <button type="submit"
                   class="danger"
                   style="background:#7f1d1d!important">
@@ -756,8 +609,8 @@ def aluno(id):
 @login_required
 def aluno_desativar(id):
     con=db()
-    con.execute(
-        "UPDATE alunos SET ativo=0 WHERE id=? AND academia_id=?",
+    con.cursor().execute(
+        "UPDATE alunos SET ativo=0 WHERE id=%s AND academia_id=%s",
         (id,aid())
     )
     con.commit()
@@ -769,8 +622,8 @@ def aluno_desativar(id):
 @login_required
 def aluno_reativar(id):
     con=db()
-    con.execute(
-        "UPDATE alunos SET ativo=1 WHERE id=? AND academia_id=?",
+    con.cursor().execute(
+        "UPDATE alunos SET ativo=1 WHERE id=%s AND academia_id=%s",
         (id,aid())
     )
     con.commit()
@@ -783,8 +636,8 @@ def aluno_reativar(id):
 def aluno_excluir(id):
     con=db()
 
-    aluno=con.execute(
-        "SELECT * FROM alunos WHERE id=? AND academia_id=?",
+    aluno=con.cursor().execute(
+        "SELECT * FROM alunos WHERE id=%s AND academia_id=%s",
         (id,aid())
     ).fetchone()
 
@@ -801,16 +654,16 @@ def aluno_excluir(id):
         "treinos",
         "matriculas"
     ):
-        con.execute(
-            f"DELETE FROM {tabela} WHERE aluno_id=? AND academia_id=?",
+        con.cursor().execute(
+            f"DELETE FROM {tabela} WHERE aluno_id=%s AND academia_id=%s",
             (id,aid())
         )
 
     # Remove a foto armazenada, quando existir.
     foto=aluno["foto"] if "foto" in aluno.keys() else None
 
-    con.execute(
-        "DELETE FROM alunos WHERE id=? AND academia_id=?",
+    con.cursor().execute(
+        "DELETE FROM alunos WHERE id=%s AND academia_id=%s",
         (id,aid())
     )
 
@@ -835,14 +688,14 @@ def checkin():
     con=db()
     if request.method=="POST":
         busca=request.form["busca"].strip()
-        x=con.execute("""SELECT * FROM alunos WHERE academia_id=? AND ativo=1 AND
-        (qr_token=? OR lower(nome) LIKE lower(?)) LIMIT 1""",(aid(),busca,"%"+busca+"%")).fetchone()
+        x=con.cursor().execute("""SELECT * FROM alunos WHERE academia_id=%s AND ativo=1 AND
+        (qr_token=%s OR lower(nome) LIKE lower(%s)) LIMIT 1""",(aid(),busca,"%"+busca+"%")).fetchone()
         if x:
-            con.execute("INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(?,?,?)",(aid(),x["id"],agora()))
+            con.cursor().execute("INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(%s,%s,%s)",(aid(),x["id"],agora()))
             con.commit(); msg="Check-in confirmado: "+x["nome"]
         else: msg="Aluno não encontrado ou inativo."
-    recentes=con.execute("""SELECT c.entrada,a.nome FROM checkins c JOIN alunos a ON a.id=c.aluno_id
-    WHERE c.academia_id=? ORDER BY c.id DESC LIMIT 12""",(aid(),)).fetchall()
+    recentes=con.cursor().execute("""SELECT c.entrada,a.nome FROM checkins c JOIN alunos a ON a.id=c.aluno_id
+    WHERE c.academia_id=%s ORDER BY c.id DESC LIMIT 12""",(aid(),)).fetchall()
     con.close()
     return page("Check-in","""
     <h1>Check-in</h1><div class="card"><form method="post"><label>Nome ou token do QR Code</label>
@@ -855,10 +708,10 @@ def checkin():
 def planos():
     con=db()
     if request.method=="POST":
-        con.execute("INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao) VALUES(?,?,?,?,?)",
+        con.cursor().execute("INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao) VALUES(%s,%s,%s,%s,%s)",
                     (aid(),request.form["nome"],float(request.form["valor"] or 0),request.form["periodicidade"],request.form.get("descricao")))
         con.commit()
-    rows=con.execute("SELECT * FROM planos WHERE academia_id=? ORDER BY id DESC",(aid(),)).fetchall(); con.close()
+    rows=con.cursor().execute("SELECT * FROM planos WHERE academia_id=%s ORDER BY id DESC",(aid(),)).fetchall(); con.close()
     return page("Planos","""
     <h1>Planos</h1><div class="grid"><div class="card"><form method="post"><label>Nome</label><input name="nome" required>
     <label>Valor</label><input type="number" step=".01" name="valor" value="0"><label>Periodicidade</label>
@@ -870,17 +723,17 @@ def planos():
 @login_required
 def financeiro():
     con=db()
-    alunos=con.execute("SELECT id,nome FROM alunos WHERE academia_id=? AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
+    alunos=con.cursor().execute("SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
     if request.method=="POST":
         f=request.form
-        con.execute("INSERT INTO pagamentos(academia_id,aluno_id,referencia,valor,forma,status,pago_em) VALUES(?,?,?,?,?,'PAGO',?)",
+        con.cursor().execute("INSERT INTO pagamentos(academia_id,aluno_id,referencia,valor,forma,status,pago_em) VALUES(%s,%s,%s,%s,%s,'PAGO',%s)",
                     (aid(),f["aluno_id"],f["referencia"],float(f["valor"]),f["forma"],agora()))
-        con.execute("INSERT INTO caixa(academia_id,tipo,descricao,valor,forma,data) VALUES(?,'ENTRADA',?,?,?,?)",
+        con.cursor().execute("INSERT INTO caixa(academia_id,tipo,descricao,valor,forma,data) VALUES(%s,'ENTRADA',%s,%s,%s,%s)",
                     (aid(),"Mensalidade "+f["referencia"],float(f["valor"]),f["forma"],agora()))
         con.commit()
-    pags=con.execute("""SELECT p.*,a.nome FROM pagamentos p JOIN alunos a ON a.id=p.aluno_id
-    WHERE p.academia_id=? ORDER BY p.id DESC LIMIT 30""",(aid(),)).fetchall()
-    total=con.execute("SELECT COALESCE(SUM(valor),0)n FROM pagamentos WHERE academia_id=? AND status='PAGO'",(aid(),)).fetchone()["n"]
+    pags=con.cursor().execute("""SELECT p.*,a.nome FROM pagamentos p JOIN alunos a ON a.id=p.aluno_id
+    WHERE p.academia_id=%s ORDER BY p.id DESC LIMIT 30""",(aid(),)).fetchall()
+    total=con.cursor().execute("SELECT COALESCE(SUM(valor),0)n FROM pagamentos WHERE academia_id=%s AND status='PAGO'",(aid(),)).fetchone()["n"]
     con.close()
     return page("Financeiro","""
     <h1>Financeiro</h1><div class="card"><div class="muted">Total recebido</div><div class="big">R$ {{'%.2f'|format(total)}}</div></div><br>
@@ -898,10 +751,10 @@ def aulas():
     con=db()
     if request.method=="POST":
         f=request.form
-        con.execute("INSERT INTO aulas(academia_id,modalidade,professor,dia,horario,capacidade) VALUES(?,?,?,?,?,?)",
+        con.cursor().execute("INSERT INTO aulas(academia_id,modalidade,professor,dia,horario,capacidade) VALUES(%s,%s,%s,%s,%s,%s)",
                     (aid(),f["modalidade"],f.get("professor"),f.get("dia"),f.get("horario"),int(f.get("capacidade") or 20)))
         con.commit()
-    rows=con.execute("SELECT * FROM aulas WHERE academia_id=? AND ativo=1 ORDER BY dia,horario",(aid(),)).fetchall(); con.close()
+    rows=con.cursor().execute("SELECT * FROM aulas WHERE academia_id=%s AND ativo=1 ORDER BY dia,horario",(aid(),)).fetchall(); con.close()
     return page("Aulas","""
     <h1>Agenda de aulas</h1><div class="grid"><div class="card"><form method="post"><label>Modalidade</label><input name="modalidade" required>
     <label>Professor</label><input name="professor"><label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
@@ -911,15 +764,15 @@ def aulas():
 @app.route("/avaliacoes", methods=["GET","POST"])
 @login_required
 def avaliacoes():
-    con=db(); alunos=con.execute("SELECT id,nome FROM alunos WHERE academia_id=? AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
+    con=db(); alunos=con.cursor().execute("SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
     if request.method=="POST":
         f=request.form
-        con.execute("""INSERT INTO avaliacoes(academia_id,aluno_id,data,peso,altura,gordura,cintura,braco,observacoes)
-        VALUES(?,?,?,?,?,?,?,?,?)""",(aid(),f["aluno_id"],f["data"],f.get("peso") or None,f.get("altura") or None,
+        con.cursor().execute("""INSERT INTO avaliacoes(academia_id,aluno_id,data,peso,altura,gordura,cintura,braco,observacoes)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(aid(),f["aluno_id"],f["data"],f.get("peso") or None,f.get("altura") or None,
         f.get("gordura") or None,f.get("cintura") or None,f.get("braco") or None,f.get("observacoes")))
         con.commit()
-    rows=con.execute("""SELECT v.*,a.nome FROM avaliacoes v JOIN alunos a ON a.id=v.aluno_id
-    WHERE v.academia_id=? ORDER BY v.id DESC LIMIT 30""",(aid(),)).fetchall(); con.close()
+    rows=con.cursor().execute("""SELECT v.*,a.nome FROM avaliacoes v JOIN alunos a ON a.id=v.aluno_id
+    WHERE v.academia_id=%s ORDER BY v.id DESC LIMIT 30""",(aid(),)).fetchall(); con.close()
     return page("Avaliações","""
     <h1>Avaliações e evolução</h1><div class="grid"><div class="card"><form method="post">
     <label>Aluno</label><select name="aluno_id">{% for a in alunos %}<option value="{{a.id}}">{{a.nome}}</option>{% endfor %}</select>
@@ -935,11 +788,11 @@ def config():
     con=db()
     if request.method=="POST":
         f=request.form
-        con.execute("""UPDATE academias SET nome=?,documento=?,telefone=?,endereco=?,cor=? WHERE id=?""",
+        con.cursor().execute("""UPDATE academias SET nome=%s,documento=%s,telefone=%s,endereco=%s,cor=%s WHERE id=%s""",
                     (f["nome"],f.get("documento"),f.get("telefone"),f.get("endereco"),f.get("cor"),aid()))
         con.commit()
-    ac=con.execute("SELECT * FROM academias WHERE id=?",(aid(),)).fetchone()
-    mods=con.execute("SELECT * FROM modalidades WHERE academia_id=? ORDER BY nome",(aid(),)).fetchall()
+    ac=con.cursor().execute("SELECT * FROM academias WHERE id=%s",(aid(),)).fetchone()
+    mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
     con.close()
     return page("Configurações","""
     <h1>Configurações</h1><div class="grid"><div class="card"><h2>Academia</h2><form method="post">
