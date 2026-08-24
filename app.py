@@ -186,6 +186,14 @@ def init_db():
             cur.execute("INSERT INTO modalidades(academia_id,nome) VALUES(?,?)",(aid,m))
         cur.execute("""INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao)
                        VALUES(?,?,?,?,?)""",(aid,"Plano Gratuito",0,"MENSAL","Plano sem cobrança"))
+    # Migrações seguras: preservam o banco existente.
+    for tabela, coluna in (
+        ("alunos","endereco"),("alunos","contato_emergencia"),("alunos","telefone_emergencia"),("alunos","foto"),
+        ("pre_cadastros","endereco"),("pre_cadastros","contato_emergencia"),("pre_cadastros","telefone_emergencia"),("pre_cadastros","foto")
+    ):
+        existentes=[r[1] for r in cur.execute(f"PRAGMA table_info({tabela})").fetchall()]
+        if coluna not in existentes:
+            cur.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} TEXT")
     con.commit()
     con.close()
 
@@ -258,6 +266,25 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
 def page(title, body, **ctx):
     inner = render_template_string(body, **ctx)
     return render_template_string(BASE, title=title, body=inner)
+
+PUBLIC_BASE = """
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{title}} · TatameOne</title><style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.pubtop{background:{{cor}};color:white;padding:20px;text-align:center}.pubtop b{font-size:25px}
+.wrap-public{max-width:760px;margin:auto;padding:16px}.card{background:white;border-radius:18px;padding:20px;box-shadow:0 2px 14px #0001}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.muted{color:#6b7280}
+input,select,textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;margin:5px 0 12px}
+label{font-size:13px;font-weight:700}button{width:100%;border:0;border-radius:11px;padding:15px;background:#16a34a;color:white;font-size:18px}
+.ok{background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:13px;color:#166534}
+@media(max-width:620px){.grid{grid-template-columns:1fr}.wrap-public{padding:12px}}
+</style></head><body><div class="pubtop"><div>TATAMEONE</div><b>{{academia}}</b></div>
+<div class="wrap-public">{{body|safe}}</div></body></html>"""
+
+def public_page(title, body, ac, **ctx):
+    inner=render_template_string(body, **ctx)
+    return render_template_string(PUBLIC_BASE,title=title,body=inner,academia=ac["nome"],cor=ac["cor"] or "#111827")
 
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -354,39 +381,49 @@ def cadastro_publico(academia_id):
     mods=con.execute("SELECT nome FROM modalidades WHERE academia_id=? AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
     if request.method=="POST":
         f=request.form
-        con.execute("""INSERT INTO pre_cadastros(academia_id,nome,documento,nascimento,telefone,email,
-        responsavel,telefone_responsavel,modalidade,graduacao,observacoes,status,criado_em)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,'PENDENTE',?)""",
+        foto_nome=None
+        foto=request.files.get("foto")
+        if foto and foto.filename:
+            ext=os.path.splitext(foto.filename)[1].lower()
+            if ext in (".jpg",".jpeg",".png",".webp"):
+                os.makedirs("static/alunos",exist_ok=True)
+                foto_nome=secrets.token_hex(12)+ext
+                foto.save(os.path.join("static/alunos",foto_nome))
+        con.execute("""INSERT INTO pre_cadastros(
+        academia_id,nome,documento,nascimento,telefone,email,responsavel,telefone_responsavel,
+        modalidade,graduacao,observacoes,status,criado_em,endereco,contato_emergencia,telefone_emergencia,foto)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,'PENDENTE',?,?,?,?,?)""",
         (academia_id,f["nome"],f.get("documento"),f.get("nascimento"),f.get("telefone"),f.get("email"),
          f.get("responsavel"),f.get("telefone_responsavel"),f.get("modalidade"),f.get("graduacao"),
-         f.get("observacoes"),agora()))
-        con.commit()
-        con.close()
-        return page("Cadastro enviado","""
+         f.get("observacoes"),agora(),f.get("endereco"),f.get("contato_emergencia"),f.get("telefone_emergencia"),foto_nome))
+        con.commit();con.close()
+        return public_page("Cadastro enviado","""
         <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
-        <div style="font-size:64px">✅</div><h1>Cadastro enviado!</h1>
-        <p>Seus dados foram enviados para <b>{{nome_academia}}</b>.</p>
-        <p class="muted">A academia fará a análise antes de ativar seu cadastro.</p></div>""",nome_academia=ac["nome"])
+        <div style="font-size:70px">✅</div><h1>Cadastro enviado com sucesso!</h1>
+        <p>Seus dados foram enviados para <b>{{nome}}</b>.</p>
+        <div class="ok">Aguarde a análise da academia. Não é necessário instalar o aplicativo.</div></div>""",ac,nome=ac["nome"])
     con.close()
-    return page("Cadastro de aluno","""
-    <div class="card" style="max-width:720px;margin:3vh auto">
-    <h1>Cadastro de aluno</h1>
-    <p class="muted">{{nome_academia}} · Preencha seus dados. Não é necessário instalar o aplicativo.</p>
-    <form method="post">
+    return public_page("Cadastro de aluno","""
+    <div class="card"><h1>Cadastro de aluno</h1>
+    <p class="muted">Preencha seus dados. Não é necessário instalar o aplicativo.</p>
+    <form method="post" enctype="multipart/form-data">
+    <label>Foto do aluno</label><input type="file" name="foto" accept="image/jpeg,image/png,image/webp" capture="user">
     <label>Nome completo *</label><input name="nome" required>
     <div class="grid">
-      <div><label>CPF/Documento</label><input name="documento"></div>
-      <div><label>Data de nascimento</label><input type="date" name="nascimento"></div>
-      <div><label>Telefone *</label><input name="telefone" required></div>
-      <div><label>E-mail</label><input type="email" name="email"></div>
-      <div><label>Modalidade desejada</label><select name="modalidade"><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select></div>
-      <div><label>Graduação/Faixa</label><input name="graduacao"></div>
-      <div><label>Responsável (se necessário)</label><input name="responsavel"></div>
-      <div><label>Telefone do responsável</label><input name="telefone_responsavel"></div>
-    </div>
-    <label>Observações</label><textarea name="observacoes"></textarea>
-    <button class="green" style="width:100%;font-size:18px;padding:15px">Enviar cadastro</button>
-    </form></div>""",nome_academia=ac["nome"],mods=mods)
+    <div><label>CPF/Documento</label><input name="documento"></div>
+    <div><label>Data de nascimento</label><input type="date" name="nascimento"></div>
+    <div><label>Telefone *</label><input name="telefone" required></div>
+    <div><label>E-mail</label><input type="email" name="email"></div></div>
+    <label>Endereço</label><input name="endereco" placeholder="Rua, número, bairro e cidade">
+    <div class="grid">
+    <div><label>Modalidade desejada</label><select name="modalidade"><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select></div>
+    <div><label>Graduação/Faixa</label><input name="graduacao"></div>
+    <div><label>Responsável (se necessário)</label><input name="responsavel"></div>
+    <div><label>Telefone do responsável</label><input name="telefone_responsavel"></div>
+    <div><label>Contato de emergência</label><input name="contato_emergencia"></div>
+    <div><label>Telefone de emergência</label><input name="telefone_emergencia"></div></div>
+    <label>Observações</label><textarea name="observacoes" rows="4"></textarea>
+    <button type="submit">Enviar cadastro</button></form></div>""",ac,mods=mods)
 
 @app.route("/alunos/pre-cadastro/<int:id>/aprovar")
 @login_required
@@ -395,10 +432,12 @@ def aprovar_pre_cadastro(id):
     p=con.execute("SELECT * FROM pre_cadastros WHERE id=? AND academia_id=? AND status='PENDENTE'",(id,aid())).fetchone()
     if p:
         con.execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
-        telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em,endereco,
+        contato_emergencia,telefone_emergencia,foto)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (aid(),p["nome"],p["documento"],p["nascimento"],p["telefone"],p["email"],p["responsavel"],
-         p["telefone_responsavel"],p["modalidade"],p["graduacao"],p["observacoes"],secrets.token_hex(8),agora()))
+         p["telefone_responsavel"],p["modalidade"],p["graduacao"],p["observacoes"],secrets.token_hex(8),agora(),
+         p["endereco"],p["contato_emergencia"],p["telefone_emergencia"],p["foto"]))
         con.execute("UPDATE pre_cadastros SET status='APROVADO' WHERE id=?",(id,))
         con.commit()
     con.close()
