@@ -538,19 +538,39 @@ def aluno_novo():
     <form method="post" enctype="multipart/form-data">
 
     <label>📷 Foto do aluno</label>
+
     <div class="grid">
       <div>
-        <label>📸 Tirar foto</label>
-        <input type="file"
+        <label for="fotoCamera"
+               class="btn green"
+               style="display:block;text-align:center;padding:16px;cursor:pointer">
+          📸 ABRIR CÂMERA
+        </label>
+        <input id="fotoCamera"
+               type="file"
                name="foto_camera"
                accept="image/*"
-               capture="environment">
+               capture="environment"
+               style="display:none"
+               onchange="document.getElementById('statusCamera').innerText=this.files.length ? '✓ Foto tirada' : ''">
+        <div id="statusCamera"
+             style="margin-top:8px;color:#16a34a;font-weight:700"></div>
       </div>
+
       <div>
-        <label>🖼️ Escolher da galeria</label>
-        <input type="file"
+        <label for="fotoGaleria"
+               class="btn"
+               style="display:block;text-align:center;padding:16px;cursor:pointer">
+          🖼️ ESCOLHER FOTO
+        </label>
+        <input id="fotoGaleria"
+               type="file"
                name="foto"
-               accept="image/jpeg,image/png,image/webp">
+               accept="image/jpeg,image/png,image/webp"
+               style="display:none"
+               onchange="document.getElementById('statusGaleria').innerText=this.files.length ? '✓ Foto selecionada' : ''">
+        <div id="statusGaleria"
+             style="margin-top:8px;color:#16a34a;font-weight:700"></div>
       </div>
     </div>
 
