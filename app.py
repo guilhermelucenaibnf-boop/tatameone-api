@@ -1137,7 +1137,54 @@ def planos():
     <label>Valor</label><input type="number" step=".01" name="valor" value="0"><label>Periodicidade</label>
     <select name="periodicidade"><option>MENSAL</option><option>TRIMESTRAL</option><option>SEMESTRAL</option><option>ANUAL</option><option>AVULSO</option></select>
     <label>Descrição</label><textarea name="descricao"></textarea><button class="green">Criar plano</button></form></div>
-    <div class="card">{% for x in rows %}<p><b>{{x.nome}}</b><br>R$ {{'%.2f'|format(x.valor)}} · {{x.periodicidade}}</p>{% endfor %}</div></div>""",rows=rows)
+    <div class="card">
+    {% for x in rows %}
+      <div style="padding:14px 0;border-bottom:1px solid #ddd">
+        <p style="margin:0 0 10px 0">
+          <b>{{x.nome}}</b><br>
+          R$ {{'%.2f'|format(x.valor)}} · {{x.periodicidade}}
+        </p>
+
+        {% if x.valor == 0 %}
+          <span class="pill">🎁 Plano gratuito</span>
+        {% endif %}
+
+        <form method="post"
+              action="/planos/{{x.id}}/excluir"
+              style="display:inline"
+              onsubmit="return confirm('Excluir o plano {{x.nome}}?');">
+          <button type="submit"
+                  class="danger"
+                  style="margin-top:8px">
+            🗑️ Excluir
+          </button>
+        </form>
+      </div>
+    {% else %}
+      <p class="muted">Nenhum plano cadastrado.</p>
+    {% endfor %}
+    </div></div>""",rows=rows)
+
+@app.route("/planos/<int:id>/excluir", methods=["POST"])
+@login_required
+def plano_excluir(id):
+    con=db()
+
+    plano=con.cursor().execute(
+        "SELECT * FROM planos WHERE id=%s AND academia_id=%s",
+        (id,aid())
+    ).fetchone()
+
+    if plano:
+        con.cursor().execute(
+            "DELETE FROM planos WHERE id=%s AND academia_id=%s",
+            (id,aid())
+        )
+        con.commit()
+
+    con.close()
+    return redirect("/planos")
+
 
 @app.route("/financeiro", methods=["GET","POST"])
 @login_required
