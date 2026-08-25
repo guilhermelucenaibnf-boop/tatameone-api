@@ -1190,27 +1190,197 @@ def plano_excluir(id):
 @login_required
 def financeiro():
     con=db()
-    alunos=con.cursor().execute("SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
+
+    alunos=con.cursor().execute(
+        "SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",
+        (aid(),)
+    ).fetchall()
+
+    # Cria referências inteligentes: mês anterior, atual e próximos 12 meses.
+    hoje=datetime.now()
+    referencias=[]
+
+    nomes_meses=[
+        "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+        "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+    ]
+
+    for deslocamento in range(-1,13):
+        total_meses=(hoje.year * 12 + hoje.month - 1) + deslocamento
+        ano=total_meses // 12
+        mes=(total_meses % 12) + 1
+
+        referencias.append({
+            "valor":f"{mes:02d}/{ano}",
+            "nome":f"{nomes_meses[mes-1]}/{ano}"
+        })
+
+    msg=""
+
     if request.method=="POST":
         f=request.form
-        con.cursor().execute("INSERT INTO pagamentos(academia_id,aluno_id,referencia,valor,forma,status,pago_em) VALUES(%s,%s,%s,%s,%s,'PAGO',%s)",
-                    (aid(),f["aluno_id"],f["referencia"],float(f["valor"]),f["forma"],agora()))
-        con.cursor().execute("INSERT INTO caixa(academia_id,tipo,descricao,valor,forma,data) VALUES(%s,'ENTRADA',%s,%s,%s,%s)",
-                    (aid(),"Mensalidade "+f["referencia"],float(f["valor"]),f["forma"],agora()))
-        con.commit()
-    pags=con.cursor().execute("""SELECT p.*,a.nome FROM pagamentos p JOIN alunos a ON a.id=p.aluno_id
-    WHERE p.academia_id=%s ORDER BY p.id DESC LIMIT 30""",(aid(),)).fetchall()
-    total=con.cursor().execute("SELECT COALESCE(SUM(valor),0)n FROM pagamentos WHERE academia_id=%s AND status='PAGO'",(aid(),)).fetchone()["n"]
+
+        aluno_id=f["aluno_id"]
+        referencia=f["referencia"]
+
+        # Impede mensalidade duplicada.
+        existente=con.cursor().execute("""
+            SELECT id
+            FROM pagamentos
+            WHERE academia_id=%s
+              AND aluno_id=%s
+              AND referencia=%s
+              AND status='PAGO'
+            LIMIT 1
+        """,(aid(),aluno_id,referencia)).fetchone()
+
+        if existente:
+            msg="⚠️ Esta mensalidade já foi registrada para este aluno."
+        else:
+            try:
+                valor=float(str(f["valor"]).replace(",","."))
+            except (ValueError,TypeError):
+                valor=0
+
+            con.cursor().execute("""
+                INSERT INTO pagamentos(
+                    academia_id,aluno_id,referencia,
+                    valor,forma,status,pago_em
+                )
+                VALUES(%s,%s,%s,%s,%s,'PAGO',%s)
+            """,(
+                aid(),
+                aluno_id,
+                referencia,
+                valor,
+                f["forma"],
+                agora()
+            ))
+
+            con.cursor().execute("""
+                INSERT INTO caixa(
+                    academia_id,tipo,descricao,
+                    valor,forma,data
+                )
+                VALUES(%s,'ENTRADA',%s,%s,%s,%s)
+            """,(
+                aid(),
+                "Mensalidade "+referencia,
+                valor,
+                f["forma"],
+                agora()
+            ))
+
+            con.commit()
+            msg="✅ Pagamento registrado com sucesso."
+
+    pags=con.cursor().execute("""
+        SELECT p.*,a.nome
+        FROM pagamentos p
+        JOIN alunos a ON a.id=p.aluno_id
+        WHERE p.academia_id=%s
+        ORDER BY p.id DESC
+        LIMIT 30
+    """,(aid(),)).fetchall()
+
+    total=con.cursor().execute("""
+        SELECT COALESCE(SUM(valor),0)n
+        FROM pagamentos
+        WHERE academia_id=%s AND status='PAGO'
+    """,(aid(),)).fetchone()["n"]
+
     con.close()
+
     return page("Financeiro","""
-    <h1>Financeiro</h1><div class="card"><div class="muted">Total recebido</div><div class="big">R$ {{'%.2f'|format(total)}}</div></div><br>
-    <div class="grid"><div class="card"><h2>Registrar pagamento</h2><form method="post">
-    <label>Aluno</label><select name="aluno_id" required>{% for a in alunos %}<option value="{{a.id}}">{{a.nome}}</option>{% endfor %}</select>
-    <label>Referência</label><input name="referencia" placeholder="08/2026" required><label>Valor</label><input type="number" step=".01" name="valor" required>
-    <label>Forma</label><select name="forma"><option>PIX</option><option>DINHEIRO</option><option>DÉBITO</option><option>CRÉDITO</option><option>BOLETO</option></select>
-    <button class="green">Registrar</button></form></div><div class="card"><h2>Últimos recebimentos</h2>
-    {% for p in pags %}<p><b>{{p.nome}}</b> · R$ {{'%.2f'|format(p.valor)}}<br><span class="muted">{{p.referencia}} · {{p.forma}} · {{p.pago_em}}</span></p>{% endfor %}</div></div>
-    """,alunos=alunos,pags=pags,total=total)
+    <h1>Financeiro</h1>
+
+    <div class="card">
+      <div class="muted">Total recebido</div>
+      <div class="big">R$ {{'%.2f'|format(total)}}</div>
+    </div>
+
+    <br>
+
+    <div class="grid">
+
+      <div class="card">
+        <h2>Registrar pagamento</h2>
+
+        {% if msg %}
+          <div style="font-weight:bold;margin-bottom:15px">
+            {{msg}}
+          </div>
+        {% endif %}
+
+        <form method="post">
+
+          <label>Aluno</label>
+          <select name="aluno_id" required>
+            {% for a in alunos %}
+              <option value="{{a.id}}">{{a.nome}}</option>
+            {% endfor %}
+          </select>
+
+          <label>Referência</label>
+          <select name="referencia" required>
+            {% for r in referencias %}
+              <option value="{{r.valor}}"
+                {% if r.valor == referencia_atual %}selected{% endif %}>
+                {{r.nome}}
+              </option>
+            {% endfor %}
+          </select>
+
+          <div class="muted" style="margin-top:5px;margin-bottom:10px">
+            📅 Competência da mensalidade
+          </div>
+
+          <label>Valor</label>
+          <input
+            type="number"
+            step=".01"
+            min="0"
+            name="valor"
+            required>
+
+          <label>Forma</label>
+          <select name="forma">
+            <option>PIX</option>
+            <option>DINHEIRO</option>
+            <option>DÉBITO</option>
+            <option>CRÉDITO</option>
+            <option>BOLETO</option>
+          </select>
+
+          <button class="green">Registrar</button>
+
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Últimos recebimentos</h2>
+
+        {% for p in pags %}
+          <p>
+            <b>{{p.nome}}</b> · R$ {{'%.2f'|format(p.valor)}}<br>
+            <span class="muted">
+              {{p.referencia}} · {{p.forma}} · {{p.pago_em}}
+            </span>
+          </p>
+        {% else %}
+          <p class="muted">Nenhum recebimento registrado.</p>
+        {% endfor %}
+      </div>
+
+    </div>
+    """,
+    alunos=alunos,
+    pags=pags,
+    total=total,
+    referencias=referencias,
+    referencia_atual=f"{hoje.month:02d}/{hoje.year}",
+    msg=msg)
+
 
 @app.route("/aulas", methods=["GET","POST"])
 @login_required
