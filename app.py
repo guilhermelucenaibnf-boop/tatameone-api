@@ -859,22 +859,191 @@ def aluno_excluir(id):
 def checkin():
     msg=""
     con=db()
+
     if request.method=="POST":
         busca=request.form["busca"].strip()
-        x=con.cursor().execute("""SELECT * FROM alunos WHERE academia_id=%s AND ativo=1 AND
-        (qr_token=%s OR lower(nome) LIKE lower(%s)) LIMIT 1""",(aid(),busca,"%"+busca+"%")).fetchone()
+
+        x=con.cursor().execute("""
+        SELECT * FROM alunos
+        WHERE academia_id=%s
+          AND ativo=1
+          AND (qr_token=%s OR lower(nome) LIKE lower(%s))
+        LIMIT 1
+        """,(aid(),busca,"%"+busca+"%")).fetchone()
+
         if x:
-            con.cursor().execute("INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(%s,%s,%s)",(aid(),x["id"],agora()))
-            con.commit(); msg="Check-in confirmado: "+x["nome"]
-        else: msg="Aluno não encontrado ou inativo."
-    recentes=con.cursor().execute("""SELECT c.entrada,a.nome FROM checkins c JOIN alunos a ON a.id=c.aluno_id
-    WHERE c.academia_id=%s ORDER BY c.id DESC LIMIT 12""",(aid(),)).fetchall()
+            con.cursor().execute(
+                "INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(%s,%s,%s)",
+                (aid(),x["id"],agora())
+            )
+            con.commit()
+            msg="Check-in confirmado: "+x["nome"]
+        else:
+            msg="Aluno não encontrado ou inativo."
+
+    recentes=con.cursor().execute("""
+        SELECT c.entrada,a.nome
+        FROM checkins c
+        JOIN alunos a ON a.id=c.aluno_id
+        WHERE c.academia_id=%s
+        ORDER BY c.id DESC
+        LIMIT 12
+    """,(aid(),)).fetchall()
+
     con.close()
+
     return page("Check-in","""
-    <h1>Check-in</h1><div class="card"><form method="post"><label>Nome ou token do QR Code</label>
-    <input name="busca" autofocus required placeholder="Digite o nome ou leia o QR"><button class="green">Confirmar entrada</button></form>
-    {% if msg %}<h3>{{msg}}</h3>{% endif %}</div><br><div class="card"><h2>Recentes</h2>
-    {% for r in recentes %}<p><b>{{r.nome}}</b> · {{r.entrada}}</p>{% endfor %}</div>""",msg=msg,recentes=recentes)
+    <h1>Check-in</h1>
+
+    <div class="card">
+
+      <form method="post" id="formCheckin">
+
+        <label>Nome ou token do QR Code</label>
+
+        <input
+          id="buscaQR"
+          name="busca"
+          autofocus
+          required
+          placeholder="Digite o nome ou leia o QR">
+
+        <div class="actions" style="margin-top:12px">
+
+          <button class="green" type="submit">
+            ✅ Confirmar entrada
+          </button>
+
+          <button
+            id="btnCamera"
+            type="button"
+            onclick="abrirLeitorQR()">
+            📷 Ler QR Code
+          </button>
+
+        </div>
+
+      </form>
+
+      {% if msg %}
+        <h3>{{msg}}</h3>
+      {% endif %}
+
+      <div
+        id="areaQR"
+        style="display:none;margin-top:18px;text-align:center">
+
+        <div
+          id="reader"
+          style="width:100%;max-width:450px;margin:auto">
+        </div>
+
+        <button
+          type="button"
+          class="danger"
+          onclick="fecharLeitorQR()"
+          style="margin-top:12px">
+          ✕ Fechar câmera
+        </button>
+
+      </div>
+
+    </div>
+
+    <br>
+
+    <div class="card">
+      <h2>Recentes</h2>
+
+      {% for r in recentes %}
+        <p><b>{{r.nome}}</b> · {{r.entrada}}</p>
+      {% else %}
+        <p class="muted">Nenhum check-in recente.</p>
+      {% endfor %}
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <script>
+    let leitorQR = null;
+    let qrProcessado = false;
+
+    async function abrirLeitorQR() {
+
+        const area = document.getElementById("areaQR");
+        const botao = document.getElementById("btnCamera");
+
+        area.style.display = "block";
+        botao.disabled = true;
+        botao.innerText = "📷 Câmera aberta";
+        qrProcessado = false;
+
+        try {
+
+            leitorQR = new Html5Qrcode("reader");
+
+            await leitorQR.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+
+                async function(texto) {
+
+                    if (qrProcessado) return;
+                    qrProcessado = true;
+
+                    document.getElementById("buscaQR").value = texto;
+
+                    try {
+                        await leitorQR.stop();
+                        leitorQR.clear();
+                    } catch(e) {}
+
+                    area.style.display = "none";
+
+                    document.getElementById("formCheckin").submit();
+                },
+
+                function(erro) {
+                }
+            );
+
+        } catch(e) {
+
+            alert(
+              "Não foi possível abrir a câmera. Verifique a permissão da câmera e se o site está usando HTTPS."
+            );
+
+            area.style.display = "none";
+            botao.disabled = false;
+            botao.innerText = "📷 Ler QR Code";
+        }
+    }
+
+    async function fecharLeitorQR() {
+
+        if (leitorQR) {
+            try {
+                await leitorQR.stop();
+                leitorQR.clear();
+            } catch(e) {}
+        }
+
+        leitorQR = null;
+        qrProcessado = false;
+
+        document.getElementById("areaQR").style.display = "none";
+
+        const botao = document.getElementById("btnCamera");
+        botao.disabled = false;
+        botao.innerText = "📷 Ler QR Code";
+    }
+    </script>
+
+    """,msg=msg,recentes=recentes)
+
 
 @app.route("/planos", methods=["GET","POST"])
 @login_required
