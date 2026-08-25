@@ -1466,7 +1466,45 @@ def aulas():
     <h1>Agenda de aulas</h1><div class="grid"><div class="card"><form method="post"><label>Modalidade</label><select name="modalidade" required><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select>
     <label>Professor</label><input name="professor"><label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
     <label>Horário</label><input type="time" name="horario"><label>Capacidade</label><input type="number" name="capacidade" value="20">
-    <button class="green">Cadastrar aula</button></form></div><div class="card">{% for x in rows %}<p><b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>{{x.professor or 'Professor não definido'}} · {{x.capacidade}} vagas</p>{% endfor %}</div></div>""",rows=rows,mods=mods)
+    <button class="green">Cadastrar aula</button></form></div><div class="card">
+    {% for x in rows %}
+      <div style="padding:14px 0;border-bottom:1px solid #ddd">
+        <p style="margin:0 0 10px 0">
+          <b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>
+          {{x.professor or 'Professor não definido'}} · {{x.capacidade}} vagas
+        </p>
+
+        <form method="post"
+              action="/aulas/{{x.id}}/excluir"
+              onsubmit="return confirm('Excluir esta aula?');">
+          <button type="submit"
+                  class="danger"
+                  style="margin-top:5px">
+            🗑️ Excluir
+          </button>
+        </form>
+      </div>
+    {% else %}
+      <p class="muted">Nenhuma aula cadastrada.</p>
+    {% endfor %}
+    </div></div>""",rows=rows,mods=mods)
+
+
+@app.route("/aulas/<int:id>/excluir", methods=["POST"])
+@login_required
+def aula_excluir(id):
+    con=db()
+
+    con.cursor().execute(
+        "DELETE FROM aulas WHERE id=%s AND academia_id=%s",
+        (id,aid())
+    )
+
+    con.commit()
+    con.close()
+
+    return redirect("/aulas")
+
 
 @app.route("/avaliacoes", methods=["GET","POST"])
 @login_required
