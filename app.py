@@ -1361,12 +1361,29 @@ def financeiro():
         <h2>Últimos recebimentos</h2>
 
         {% for p in pags %}
-          <p>
-            <b>{{p.nome}}</b> · R$ {{'%.2f'|format(p.valor)}}<br>
-            <span class="muted">
-              {{p.referencia}} · {{p.forma}} · {{p.pago_em}}
-            </span>
-          </p>
+          <div style="padding:14px 0;border-bottom:1px solid #ddd">
+
+            <p style="margin:0 0 10px 0">
+              <b>{{p.nome}}</b> · R$ {{'%.2f'|format(p.valor)}}<br>
+              <span class="muted">
+                {{p.referencia}} · {{p.forma}} · {{p.pago_em}}
+              </span>
+            </p>
+
+            <form method="post"
+                  action="/financeiro/{{p.id}}/excluir"
+                  style="display:inline"
+                  onsubmit="return confirm('Excluir este recebimento? O valor também será retirado do financeiro.');">
+
+              <button type="submit"
+                      class="danger"
+                      style="margin-top:5px">
+                🗑️ Excluir
+              </button>
+
+            </form>
+
+          </div>
         {% else %}
           <p class="muted">Nenhum recebimento registrado.</p>
         {% endfor %}
@@ -1380,6 +1397,57 @@ def financeiro():
     referencias=referencias,
     referencia_atual=f"{hoje.month:02d}/{hoje.year}",
     msg=msg)
+
+
+
+@app.route("/financeiro/<int:id>/excluir", methods=["POST"])
+@login_required
+def financeiro_excluir(id):
+    con=db()
+
+    pagamento=con.cursor().execute("""
+        SELECT *
+        FROM pagamentos
+        WHERE id=%s AND academia_id=%s
+    """,(id,aid())).fetchone()
+
+    if pagamento:
+
+        # Procura somente UMA entrada correspondente no caixa.
+        caixa=con.cursor().execute("""
+            SELECT id
+            FROM caixa
+            WHERE academia_id=%s
+              AND tipo='ENTRADA'
+              AND descricao=%s
+              AND valor=%s
+              AND forma=%s
+              AND data=%s
+            ORDER BY id DESC
+            LIMIT 1
+        """,(
+            aid(),
+            "Mensalidade "+pagamento["referencia"],
+            pagamento["valor"],
+            pagamento["forma"],
+            pagamento["pago_em"]
+        )).fetchone()
+
+        if caixa:
+            con.cursor().execute("""
+                DELETE FROM caixa
+                WHERE id=%s AND academia_id=%s
+            """,(caixa["id"],aid()))
+
+        con.cursor().execute("""
+            DELETE FROM pagamentos
+            WHERE id=%s AND academia_id=%s
+        """,(id,aid()))
+
+        con.commit()
+
+    con.close()
+    return redirect("/financeiro")
 
 
 @app.route("/aulas", methods=["GET","POST"])
