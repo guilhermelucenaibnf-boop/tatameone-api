@@ -7,7 +7,7 @@ import io
 import base64
 from datetime import datetime
 from functools import wraps
-from flask import Flask, request, redirect, url_for, session, render_template_string, flash
+from flask import Flask, request, redirect, url_for, session, render_template_string, flash, send_from_directory
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tatameone-2-troque-em-producao")
@@ -17,6 +17,18 @@ def db():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL não configurada no Render.")
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory("public", "manifest.json", mimetype="application/manifest+json")
+
+@app.route("/icon-192.png")
+def icon_192():
+    return send_from_directory("public", "icon-192.png", mimetype="image/png")
+
+@app.route("/icon-512.png")
+def icon_512():
+    return send_from_directory("public", "icon-512.png", mimetype="image/png")
 
 def agora():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -68,6 +80,10 @@ BASE = """
 <!doctype html><html lang="pt-BR"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{title}} · TatameOne</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<meta name="theme-color" content="#e52e3d">
 <style>
 *{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
 .top{background:#111827;color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0}
