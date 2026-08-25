@@ -1459,12 +1459,14 @@ def aulas():
         con.cursor().execute("INSERT INTO aulas(academia_id,modalidade,professor,dia,horario,capacidade) VALUES(%s,%s,%s,%s,%s,%s)",
                     (aid(),f["modalidade"],f.get("professor"),f.get("dia"),f.get("horario"),int(f.get("capacidade") or 20)))
         con.commit()
-    rows=con.cursor().execute("SELECT * FROM aulas WHERE academia_id=%s AND ativo=1 ORDER BY dia,horario",(aid(),)).fetchall(); con.close()
+    rows=con.cursor().execute("SELECT * FROM aulas WHERE academia_id=%s AND ativo=1 ORDER BY dia,horario",(aid(),)).fetchall()
+    mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
+    con.close()
     return page("Aulas","""
-    <h1>Agenda de aulas</h1><div class="grid"><div class="card"><form method="post"><label>Modalidade</label><input name="modalidade" required>
+    <h1>Agenda de aulas</h1><div class="grid"><div class="card"><form method="post"><label>Modalidade</label><select name="modalidade" required><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select>
     <label>Professor</label><input name="professor"><label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
     <label>Horário</label><input type="time" name="horario"><label>Capacidade</label><input type="number" name="capacidade" value="20">
-    <button class="green">Cadastrar aula</button></form></div><div class="card">{% for x in rows %}<p><b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>{{x.professor or 'Professor não definido'}} · {{x.capacidade}} vagas</p>{% endfor %}</div></div>""",rows=rows)
+    <button class="green">Cadastrar aula</button></form></div><div class="card">{% for x in rows %}<p><b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>{{x.professor or 'Professor não definido'}} · {{x.capacidade}} vagas</p>{% endfor %}</div></div>""",rows=rows,mods=mods)
 
 @app.route("/avaliacoes", methods=["GET","POST"])
 @login_required
