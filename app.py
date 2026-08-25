@@ -888,17 +888,44 @@ def checkin():
         """,(aid(),busca,"%"+busca+"%")).fetchone()
 
         if x:
-            con.cursor().execute(
-                "INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(%s,%s,%s)",
-                (aid(),x["id"],agora())
-            )
-            con.commit()
-            msg="Check-in confirmado: "+x["nome"]
+            ultimo=con.cursor().execute("""
+                SELECT entrada
+                FROM checkins
+                WHERE academia_id=%s AND aluno_id=%s
+                ORDER BY id DESC
+                LIMIT 1
+            """,(aid(),x["id"])).fetchone()
+
+            duplicado=False
+
+            if ultimo and ultimo["entrada"]:
+                try:
+                    entrada_anterior=datetime.strptime(
+                        ultimo["entrada"],
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    agora_dt=datetime.now()
+                    segundos=(agora_dt-entrada_anterior).total_seconds()
+
+                    if 0 <= segundos < 300:
+                        duplicado=True
+                except (ValueError, TypeError):
+                    pass
+
+            if duplicado:
+                msg="⚠️ Check-in não registrado: "+x["nome"]+" já realizou check-in nos últimos 5 minutos."
+            else:
+                con.cursor().execute(
+                    "INSERT INTO checkins(academia_id,aluno_id,entrada) VALUES(%s,%s,%s)",
+                    (aid(),x["id"],agora())
+                )
+                con.commit()
+                msg="✅ Check-in confirmado: "+x["nome"]
         else:
             msg="Aluno não encontrado ou inativo."
 
     recentes=con.cursor().execute("""
-        SELECT c.entrada,a.nome
+        SELECT c.id,c.entrada,a.nome
         FROM checkins c
         JOIN alunos a ON a.id=c.aluno_id
         WHERE c.academia_id=%s
@@ -972,7 +999,26 @@ def checkin():
       <h2>Recentes</h2>
 
       {% for r in recentes %}
-        <p><b>{{r.nome}}</b> · {{r.entrada}}</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #e5e7eb">
+
+          <div>
+            <b>{{r.nome}}</b><br>
+            <span class="muted">{{r.entrada}}</span>
+          </div>
+
+          <form method="post"
+                action="/checkin/{{r.id}}/excluir"
+                onsubmit="return confirm('Excluir este check-in de {{r.nome}}?')">
+
+            <button type="submit"
+                    class="danger"
+                    style="padding:9px 12px">
+              🗑️ Excluir
+            </button>
+
+          </form>
+
+        </div>
       {% else %}
         <p class="muted">Nenhum check-in recente.</p>
       {% endfor %}
@@ -1059,6 +1105,22 @@ def checkin():
     </script>
 
     """,msg=msg,recentes=recentes)
+
+
+@app.route("/checkin/<int:id>/excluir", methods=["POST"])
+@login_required
+def checkin_excluir(id):
+    con=db()
+
+    con.cursor().execute(
+        "DELETE FROM checkins WHERE id=%s AND academia_id=%s",
+        (id,aid())
+    )
+
+    con.commit()
+    con.close()
+
+    return redirect("/checkin")
 
 
 @app.route("/planos", methods=["GET","POST"])
