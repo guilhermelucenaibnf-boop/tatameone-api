@@ -1525,7 +1525,69 @@ def avaliacoes():
     <div><label>Altura (m)</label><input name="altura" type="number" step=".01"></div><div><label>Gordura %</label><input name="gordura" type="number" step=".01"></div>
     <div><label>Cintura (cm)</label><input name="cintura" type="number" step=".01"></div><div><label>Braço (cm)</label><input name="braco" type="number" step=".01"></div></div>
     <label>Observações</label><textarea name="observacoes"></textarea><button class="green">Salvar avaliação</button></form></div>
-    <div class="card">{% for x in rows %}<p><b>{{x.nome}}</b> · {{x.data}}<br>Peso: {{x.peso or '-'}} kg · Gordura: {{x.gordura or '-'}}%</p>{% endfor %}</div></div>""",alunos=alunos,rows=rows)
+    <div class="card">
+    <h2>Histórico de avaliações</h2>
+
+    {% for x in rows %}
+      <div style="padding:14px 0;border-bottom:1px solid #ddd">
+
+        <p style="margin:0 0 8px 0">
+          <b>{{x.nome}}</b> · {{x.data}}
+        </p>
+
+        <p style="margin:0 0 10px 0">
+          Peso: <b>{{x.peso or '-'}}</b> kg<br>
+          Altura: <b>{{x.altura or '-'}}</b> m<br>
+
+          {% if x.peso and x.altura %}
+            IMC:
+            <b>{{'%.2f'|format(x.peso / (x.altura * x.altura))}}</b><br>
+          {% endif %}
+
+          Gordura: <b>{{x.gordura or '-'}}</b>%<br>
+          Cintura: <b>{{x.cintura or '-'}}</b> cm<br>
+          Braço: <b>{{x.braco or '-'}}</b> cm
+        </p>
+
+        {% if x.observacoes %}
+          <p class="muted">
+            📝 {{x.observacoes}}
+          </p>
+        {% endif %}
+
+        <form method="post"
+              action="/avaliacoes/{{x.id}}/excluir"
+              onsubmit="return confirm('Excluir esta avaliação?');">
+
+          <button type="submit"
+                  class="danger"
+                  style="margin-top:5px">
+            🗑️ Excluir
+          </button>
+        </form>
+
+      </div>
+    {% else %}
+      <p class="muted">Nenhuma avaliação registrada.</p>
+    {% endfor %}
+
+    </div></div>""",alunos=alunos,rows=rows)
+
+
+@app.route("/avaliacoes/<int:id>/excluir", methods=["POST"])
+@login_required
+def avaliacao_excluir(id):
+    con=db()
+
+    con.cursor().execute(
+        "DELETE FROM avaliacoes WHERE id=%s AND academia_id=%s",
+        (id,aid())
+    )
+
+    con.commit()
+    con.close()
+
+    return redirect("/avaliacoes")
 
 @app.route("/config", methods=["GET","POST"])
 @login_required
