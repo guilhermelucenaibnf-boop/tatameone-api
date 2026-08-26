@@ -150,12 +150,12 @@ BASE = """
 .big{font-size:28px;font-weight:800}.muted{color:#6b7280}
 .nav-wrap{max-width:1150px;margin:auto;padding:14px 18px 0}
 .nav{display:grid;grid-template-columns:1fr;gap:16px}
-.nav a.btn{min-height:120px;border-radius:22px;padding:20px 22px;display:flex;align-items:center;gap:18px;text-align:left;box-shadow:0 4px 18px #00000018}
-.nav-icon{font-size:48px;line-height:1;width:64px;text-align:center;flex:0 0 64px}
+.nav a.btn{min-height:140px;border-radius:24px;padding:24px 22px;display:flex;align-items:center;gap:18px;text-align:left;box-shadow:0 4px 18px #00000018}
+.nav-icon{font-size:58px;line-height:1;width:74px;text-align:center;flex:0 0 74px}
 .nav-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.nav-title{font-size:24px;font-weight:800;line-height:1.1}
-.nav-desc{font-size:15px;color:#6b7280;font-weight:400;line-height:1.3}
-.nav-arrow{font-size:42px;font-weight:800;color:#16a34a}
+.nav-title{font-size:30px;font-weight:800;line-height:1.1}
+.nav-desc{font-size:17px;color:#6b7280;font-weight:400;line-height:1.3}
+.nav-arrow{font-size:50px;font-weight:800;color:#16a34a}
 .nav a.danger .nav-desc,.nav a.danger .nav-arrow{color:#fee2e2}
 a.btn,button{border:0;border-radius:10px;padding:11px 14px;background:#111827;color:white;text-decoration:none;cursor:pointer}
 a.green,button.green{background:#16a34a} a.light{background:white;color:#111827;border:1px solid #ddd}
