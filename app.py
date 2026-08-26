@@ -1651,9 +1651,57 @@ def avaliacoes():
     .avaliacoes-layout{
         display:grid;
         grid-template-columns:1fr;
-        gap:12px;
+        gap:24px;
         align-items:start;
     }
+
+    .avaliacoes-layout .card{
+        padding:28px;
+        border-radius:28px;
+    }
+
+    .avaliacoes-layout h2{
+        font-size:34px;
+        margin:18px 0 24px;
+    }
+
+    .avaliacoes-layout label{
+        font-size:22px;
+        font-weight:700;
+        display:block;
+        margin-top:12px;
+    }
+
+    .avaliacoes-layout input,
+    .avaliacoes-layout select,
+    .avaliacoes-layout textarea{
+        font-size:25px;
+        padding:20px 22px;
+        min-height:68px;
+        border-radius:18px;
+        margin:10px 0 22px;
+    }
+
+    .avaliacoes-layout textarea{
+        min-height:130px;
+    }
+
+    .avaliacoes-layout .grid{
+        gap:20px;
+    }
+
+    .avaliacoes-layout p{
+        font-size:24px;
+        line-height:1.35;
+    }
+
+    .avaliacoes-layout button{
+        font-size:24px !important;
+        padding:18px 24px;
+        min-height:64px;
+        border-radius:16px;
+    }
+
     @media(max-width:760px){
         .avaliacoes-layout{
             grid-template-columns:1fr;
