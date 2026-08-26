@@ -191,7 +191,7 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
 {% endif %}
 {% if session.get('uid') and request.path != '/' %}
 <div style="max-width:1150px;margin:14px auto 0;padding:0 18px">
-<a href="/" style="display:inline-flex;align-items:center;gap:8px;background:#111827;color:white;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">← Voltar ao Painel</a>
+<a href="/" style="display:inline-flex;align-items:center;gap:12px;background:#111827;color:white;text-decoration:none;padding:20px 28px;border-radius:16px;font-weight:800;font-size:26px;min-height:64px">← Voltar ao Painel</a>
 </div>
 {% endif %}
 <div class="wrap">{{body|safe}}</div></body></html>
