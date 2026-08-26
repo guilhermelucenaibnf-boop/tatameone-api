@@ -1647,7 +1647,21 @@ def avaliacoes():
     return page("Avaliações","""
     <h1>🌍 Avaliações e evolução</h1>
 
-    <div class="grid">
+    <style>
+    .avaliacoes-layout{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:12px;
+        align-items:start;
+    }
+    @media(max-width:760px){
+        .avaliacoes-layout{
+            grid-template-columns:1fr;
+        }
+    }
+    </style>
+
+    <div class="avaliacoes-layout">
 
       <div class="card">
 
