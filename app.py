@@ -54,63 +54,6 @@ def init_db():
 """CREATE TABLE IF NOT EXISTS pre_cadastros(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,documento TEXT,nascimento TEXT,telefone TEXT,email TEXT,responsavel TEXT,telefone_responsavel TEXT,modalidade TEXT,graduacao TEXT,observacoes TEXT,status TEXT DEFAULT 'PENDENTE',criado_em TEXT NOT NULL,endereco TEXT,contato_emergencia TEXT,telefone_emergencia TEXT,foto TEXT)"""
     ]
     for sql in comandos: cur.execute(sql)
-
-    # Evolução internacional do módulo de avaliações físicas.
-    # ADD COLUMN IF NOT EXISTS preserva avaliações já cadastradas.
-    colunas_avaliacao = [
-        ("pescoco", "DOUBLE PRECISION"),
-        ("ombros", "DOUBLE PRECISION"),
-        ("peito", "DOUBLE PRECISION"),
-        ("abdomen", "DOUBLE PRECISION"),
-        ("quadril", "DOUBLE PRECISION"),
-        ("braco_direito", "DOUBLE PRECISION"),
-        ("braco_esquerdo", "DOUBLE PRECISION"),
-        ("antebraco_direito", "DOUBLE PRECISION"),
-        ("antebraco_esquerdo", "DOUBLE PRECISION"),
-        ("coxa_direita", "DOUBLE PRECISION"),
-        ("coxa_esquerda", "DOUBLE PRECISION"),
-        ("panturrilha_direita", "DOUBLE PRECISION"),
-        ("panturrilha_esquerda", "DOUBLE PRECISION"),
-
-        # Composição corporal
-        ("massa_muscular", "DOUBLE PRECISION"),
-        ("massa_ossea", "DOUBLE PRECISION"),
-        ("agua_corporal", "DOUBLE PRECISION"),
-        ("gordura_visceral", "DOUBLE PRECISION"),
-        ("metabolismo_basal", "DOUBLE PRECISION"),
-
-        # Dobras cutâneas
-        ("dobra_peitoral", "DOUBLE PRECISION"),
-        ("dobra_abdominal", "DOUBLE PRECISION"),
-        ("dobra_coxa", "DOUBLE PRECISION"),
-        ("dobra_triceps", "DOUBLE PRECISION"),
-        ("dobra_subescapular", "DOUBLE PRECISION"),
-        ("dobra_suprailiaca", "DOUBLE PRECISION"),
-        ("dobra_axilar", "DOUBLE PRECISION"),
-
-        # Performance
-        ("flexibilidade", "DOUBLE PRECISION"),
-        ("forca", "DOUBLE PRECISION"),
-        ("resistencia", "DOUBLE PRECISION"),
-        ("agilidade", "DOUBLE PRECISION"),
-
-        # Sinais básicos
-        ("pressao_sistolica", "DOUBLE PRECISION"),
-        ("pressao_diastolica", "DOUBLE PRECISION"),
-        ("frequencia_cardiaca", "DOUBLE PRECISION"),
-        ("frequencia_repouso", "DOUBLE PRECISION"),
-
-        # Objetivo e protocolo
-        ("objetivo", "TEXT"),
-        ("protocolo", "TEXT"),
-        ("unidade", "TEXT DEFAULT 'METRICO'")
-    ]
-
-    for nome_coluna, tipo_coluna in colunas_avaliacao:
-        cur.execute(
-            f"ALTER TABLE avaliacoes ADD COLUMN IF NOT EXISTS {nome_coluna} {tipo_coluna}"
-        )
-
     cur.execute("SELECT COUNT(*) AS n FROM academias")
     if cur.fetchone()["n"]==0:
         cur.execute("INSERT INTO academias(nome,plano,criado_em) VALUES(%s,%s,%s) RETURNING id",("TatameOne Demonstração","PREMIUM",agora()))
@@ -1566,306 +1509,69 @@ def aula_excluir(id):
 @app.route("/avaliacoes", methods=["GET","POST"])
 @login_required
 def avaliacoes():
-    con=db()
-
-    alunos=con.cursor().execute(
-        "SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",
-        (aid(),)
-    ).fetchall()
-
-    campos_numericos = [
-        "peso","altura","gordura","cintura","braco",
-        "pescoco","ombros","peito","abdomen","quadril",
-        "braco_direito","braco_esquerdo",
-        "antebraco_direito","antebraco_esquerdo",
-        "coxa_direita","coxa_esquerda",
-        "panturrilha_direita","panturrilha_esquerda",
-        "massa_muscular","massa_ossea","agua_corporal",
-        "gordura_visceral","metabolismo_basal",
-        "dobra_peitoral","dobra_abdominal","dobra_coxa",
-        "dobra_triceps","dobra_subescapular",
-        "dobra_suprailiaca","dobra_axilar",
-        "flexibilidade","forca","resistencia","agilidade",
-        "pressao_sistolica","pressao_diastolica",
-        "frequencia_cardiaca","frequencia_repouso"
-    ]
-
+    con=db(); alunos=con.cursor().execute("SELECT id,nome FROM alunos WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
     if request.method=="POST":
         f=request.form
-
-        valores=[]
-        for campo in campos_numericos:
-            valor=f.get(campo)
-            if valor:
-                try:
-                    valores.append(float(str(valor).replace(",",".")))
-                except (ValueError,TypeError):
-                    valores.append(None)
-            else:
-                valores.append(None)
-
-        colunas = ",".join(campos_numericos)
-
-        marcadores = ",".join(["%s"] * (
-            3 + len(campos_numericos) + 4
-        ))
-
-        sql=f"""
-            INSERT INTO avaliacoes(
-                academia_id,aluno_id,data,
-                {colunas},
-                objetivo,protocolo,unidade,observacoes
-            )
-            VALUES({marcadores})
-        """
-
-        parametros = [
-            aid(),
-            f["aluno_id"],
-            f["data"],
-            *valores,
-            f.get("objetivo") or None,
-            f.get("protocolo") or None,
-            f.get("unidade") or "METRICO",
-            f.get("observacoes") or None
-        ]
-
-        con.cursor().execute(sql,parametros)
+        con.cursor().execute("""INSERT INTO avaliacoes(academia_id,aluno_id,data,peso,altura,gordura,cintura,braco,observacoes)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(aid(),f["aluno_id"],f["data"],f.get("peso") or None,f.get("altura") or None,
+        f.get("gordura") or None,f.get("cintura") or None,f.get("braco") or None,f.get("observacoes")))
         con.commit()
-
-    rows=con.cursor().execute("""
-        SELECT v.*,a.nome
-        FROM avaliacoes v
-        JOIN alunos a ON a.id=v.aluno_id
-        WHERE v.academia_id=%s
-        ORDER BY v.data DESC,v.id DESC
-        LIMIT 50
-    """,(aid(),)).fetchall()
-
-    con.close()
-
+    rows=con.cursor().execute("""SELECT v.*,a.nome FROM avaliacoes v JOIN alunos a ON a.id=v.aluno_id
+    WHERE v.academia_id=%s ORDER BY v.id DESC LIMIT 30""",(aid(),)).fetchall(); con.close()
     return page("Avaliações","""
-    <h1>🌍 Avaliações e evolução</h1>
+    <h1>Avaliações e evolução</h1><div class="grid"><div class="card"><form method="post">
+    <label>Aluno</label><select name="aluno_id">{% for a in alunos %}<option value="{{a.id}}">{{a.nome}}</option>{% endfor %}</select>
+    <label>Data</label><input type="date" name="data" required><div class="grid"><div><label>Peso (kg)</label><input name="peso" type="number" step=".01"></div>
+    <div><label>Altura (m)</label><input name="altura" type="number" step=".01"></div><div><label>Gordura %</label><input name="gordura" type="number" step=".01"></div>
+    <div><label>Cintura (cm)</label><input name="cintura" type="number" step=".01"></div><div><label>Braço (cm)</label><input name="braco" type="number" step=".01"></div></div>
+    <label>Observações</label><textarea name="observacoes"></textarea><button class="green">Salvar avaliação</button></form></div>
+    <div class="card">
+    <h2>Histórico de avaliações</h2>
 
-    <div class="grid">
+    {% for x in rows %}
+      <div style="padding:14px 0;border-bottom:1px solid #ddd">
 
-      <div class="card">
+        <p style="margin:0 0 8px 0">
+          <b>{{x.nome}}</b> · {{x.data}}
+        </p>
 
-        <form method="post">
+        <p style="margin:0 0 10px 0">
+          Peso: <b>{{x.peso or '-'}}</b> kg<br>
+          Altura: <b>{{x.altura or '-'}}</b> m<br>
 
-          <h2>👤 Dados básicos</h2>
+          {% if x.peso and x.altura %}
+            IMC:
+            <b>{{'%.2f'|format(x.peso / (x.altura * x.altura))}}</b><br>
+          {% endif %}
 
-          <label>Aluno</label>
-          <select name="aluno_id" required>
-            {% for a in alunos %}
-              <option value="{{a.id}}">{{a.nome}}</option>
-            {% endfor %}
-          </select>
+          Gordura: <b>{{x.gordura or '-'}}</b>%<br>
+          Cintura: <b>{{x.cintura or '-'}}</b> cm<br>
+          Braço: <b>{{x.braco or '-'}}</b> cm
+        </p>
 
-          <label>Data da avaliação</label>
-          <input type="date" name="data" required>
+        {% if x.observacoes %}
+          <p class="muted">
+            📝 {{x.observacoes}}
+          </p>
+        {% endif %}
 
-          <label>Sistema de unidades</label>
-          <select name="unidade">
-            <option value="METRICO">Métrico — kg / cm</option>
-            <option value="IMPERIAL">Imperial — lb / in</option>
-          </select>
+        <form method="post"
+              action="/avaliacoes/{{x.id}}/excluir"
+              onsubmit="return confirm('Excluir esta avaliação?');">
 
-          <div class="grid">
-            <div>
-              <label>Peso</label>
-              <input name="peso" type="number" step=".01">
-            </div>
-            <div>
-              <label>Altura</label>
-              <input name="altura" type="number" step=".01">
-            </div>
-            <div>
-              <label>Gordura corporal %</label>
-              <input name="gordura" type="number" step=".01">
-            </div>
-          </div>
-
-          <hr>
-
-          <h2>📏 Perimetria</h2>
-
-          <div class="grid">
-            <div><label>Pescoço</label><input name="pescoco" type="number" step=".01"></div>
-            <div><label>Ombros</label><input name="ombros" type="number" step=".01"></div>
-            <div><label>Peito / Tórax</label><input name="peito" type="number" step=".01"></div>
-            <div><label>Cintura</label><input name="cintura" type="number" step=".01"></div>
-            <div><label>Abdômen</label><input name="abdomen" type="number" step=".01"></div>
-            <div><label>Quadril</label><input name="quadril" type="number" step=".01"></div>
-
-            <div><label>Braço direito</label><input name="braco_direito" type="number" step=".01"></div>
-            <div><label>Braço esquerdo</label><input name="braco_esquerdo" type="number" step=".01"></div>
-
-            <div><label>Antebraço direito</label><input name="antebraco_direito" type="number" step=".01"></div>
-            <div><label>Antebraço esquerdo</label><input name="antebraco_esquerdo" type="number" step=".01"></div>
-
-            <div><label>Coxa direita</label><input name="coxa_direita" type="number" step=".01"></div>
-            <div><label>Coxa esquerda</label><input name="coxa_esquerda" type="number" step=".01"></div>
-
-            <div><label>Panturrilha direita</label><input name="panturrilha_direita" type="number" step=".01"></div>
-            <div><label>Panturrilha esquerda</label><input name="panturrilha_esquerda" type="number" step=".01"></div>
-          </div>
-
-          <hr>
-
-          <h2>🧬 Composição corporal</h2>
-
-          <div class="grid">
-            <div><label>Massa muscular</label><input name="massa_muscular" type="number" step=".01"></div>
-            <div><label>Massa óssea</label><input name="massa_ossea" type="number" step=".01"></div>
-            <div><label>Água corporal %</label><input name="agua_corporal" type="number" step=".01"></div>
-            <div><label>Gordura visceral</label><input name="gordura_visceral" type="number" step=".01"></div>
-            <div><label>Metabolismo basal (kcal)</label><input name="metabolismo_basal" type="number" step=".01"></div>
-          </div>
-
-          <hr>
-
-          <h2>📐 Dobras cutâneas</h2>
-
-          <div class="grid">
-            <div><label>Peitoral (mm)</label><input name="dobra_peitoral" type="number" step=".01"></div>
-            <div><label>Abdominal (mm)</label><input name="dobra_abdominal" type="number" step=".01"></div>
-            <div><label>Coxa (mm)</label><input name="dobra_coxa" type="number" step=".01"></div>
-            <div><label>Tríceps (mm)</label><input name="dobra_triceps" type="number" step=".01"></div>
-            <div><label>Subescapular (mm)</label><input name="dobra_subescapular" type="number" step=".01"></div>
-            <div><label>Supra-ilíaca (mm)</label><input name="dobra_suprailiaca" type="number" step=".01"></div>
-            <div><label>Axilar (mm)</label><input name="dobra_axilar" type="number" step=".01"></div>
-          </div>
-
-          <hr>
-
-          <h2>🏃 Performance</h2>
-
-          <div class="grid">
-            <div><label>Flexibilidade</label><input name="flexibilidade" type="number" step=".01"></div>
-            <div><label>Força</label><input name="forca" type="number" step=".01"></div>
-            <div><label>Resistência</label><input name="resistencia" type="number" step=".01"></div>
-            <div><label>Agilidade</label><input name="agilidade" type="number" step=".01"></div>
-          </div>
-
-          <hr>
-
-          <h2>❤️ Sinais básicos</h2>
-
-          <div class="grid">
-            <div><label>Pressão sistólica</label><input name="pressao_sistolica" type="number" step="1"></div>
-            <div><label>Pressão diastólica</label><input name="pressao_diastolica" type="number" step="1"></div>
-            <div><label>Frequência cardíaca</label><input name="frequencia_cardiaca" type="number" step="1"></div>
-            <div><label>FC de repouso</label><input name="frequencia_repouso" type="number" step="1"></div>
-          </div>
-
-          <hr>
-
-          <h2>🎯 Objetivo e protocolo</h2>
-
-          <label>Objetivo</label>
-          <select name="objetivo">
-            <option value="">Selecione</option>
-            <option>Emagrecimento</option>
-            <option>Hipertrofia</option>
-            <option>Condicionamento físico</option>
-            <option>Performance esportiva</option>
-            <option>Mobilidade / Flexibilidade</option>
-            <option>Qualidade de vida</option>
-            <option>Outro</option>
-          </select>
-
-          <label>Protocolo de avaliação</label>
-          <select name="protocolo">
-            <option value="">Não definido</option>
-            <option>Antropometria</option>
-            <option>Bioimpedância</option>
-            <option>Jackson & Pollock 3 dobras</option>
-            <option>Jackson & Pollock 7 dobras</option>
-            <option>Pollock 3 dobras</option>
-            <option>Faulkner</option>
-            <option>Personalizado</option>
-          </select>
-
-          <label>Observações</label>
-          <textarea name="observacoes" rows="4"></textarea>
-
-          <button class="green"
-                  style="width:100%;font-size:17px">
-            💾 Salvar avaliação completa
+          <button type="submit"
+                  class="danger"
+                  style="margin-top:5px">
+            🗑️ Excluir
           </button>
-
         </form>
 
       </div>
+    {% else %}
+      <p class="muted">Nenhuma avaliação registrada.</p>
+    {% endfor %}
 
-      <div class="card">
-
-        <h2>📈 Histórico de avaliações</h2>
-
-        {% for x in rows %}
-
-          <div style="padding:15px 0;border-bottom:1px solid #ddd">
-
-            <p>
-              <b>{{x.nome}}</b> · {{x.data}}
-            </p>
-
-            <p>
-              Peso: <b>{{x.peso or '-'}}</b><br>
-              Altura: <b>{{x.altura or '-'}}</b><br>
-
-              {% if x.peso and x.altura and x.unidade != 'IMPERIAL' %}
-                IMC:
-                <b>{{'%.2f'|format(x.peso / (x.altura * x.altura))}}</b><br>
-              {% endif %}
-
-              Gordura: <b>{{x.gordura or '-'}}</b>%<br>
-              Cintura: <b>{{x.cintura or '-'}}</b><br>
-              Abdômen: <b>{{x.abdomen or '-'}}</b><br>
-              Quadril: <b>{{x.quadril or '-'}}</b>
-            </p>
-
-            {% if x.pressao_sistolica or x.pressao_diastolica %}
-              <p>
-                ❤️ PA:
-                {{x.pressao_sistolica or '-'}} /
-                {{x.pressao_diastolica or '-'}}
-              </p>
-            {% endif %}
-
-            {% if x.objetivo %}
-              <p>🎯 {{x.objetivo}}</p>
-            {% endif %}
-
-            {% if x.protocolo %}
-              <p class="muted">📋 {{x.protocolo}}</p>
-            {% endif %}
-
-            {% if x.observacoes %}
-              <p class="muted">📝 {{x.observacoes}}</p>
-            {% endif %}
-
-            <form method="post"
-                  action="/avaliacoes/{{x.id}}/excluir"
-                  onsubmit="return confirm('Excluir esta avaliação?');">
-
-              <button type="submit" class="danger">
-                🗑️ Excluir
-              </button>
-
-            </form>
-
-          </div>
-
-        {% else %}
-          <p class="muted">Nenhuma avaliação registrada.</p>
-        {% endfor %}
-
-      </div>
-
-    </div>
-    """,alunos=alunos,rows=rows)
+    </div></div>""",alunos=alunos,rows=rows)
 
 
 @app.route("/avaliacoes/<int:id>/excluir", methods=["POST"])
@@ -1882,7 +1588,6 @@ def avaliacao_excluir(id):
     con.close()
 
     return redirect("/avaliacoes")
-
 
 @app.route("/config", methods=["GET","POST"])
 @login_required
