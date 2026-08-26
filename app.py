@@ -159,10 +159,57 @@ BASE = """
 .nav a.danger .nav-desc,.nav a.danger .nav-arrow{color:#fee2e2}
 a.btn,button{border:0;border-radius:10px;padding:11px 14px;background:#111827;color:white;text-decoration:none;cursor:pointer}
 a.green,button.green{background:#16a34a} a.light{background:white;color:#111827;border:1px solid #ddd}
-input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:10px;margin:5px 0 12px}
-label{font-size:13px;font-weight:700} table{width:100%;border-collapse:collapse;background:white}
-th,td{text-align:left;padding:10px;border-bottom:1px solid #eee}.pill{padding:5px 8px;border-radius:99px;background:#dcfce7;font-size:12px}
-h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
+input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:10px;margin:5px 0 12px;font-size:24px}
+label{font-size:26px;font-weight:700} table{width:100%;border-collapse:collapse;background:white;font-size:22px}
+th,td{text-align:left;padding:10px;border-bottom:1px solid #eee}.pill{padding:5px 8px;border-radius:99px;background:#dcfce7;font-size:20px}
+h1{margin-top:5px;font-size:38px}
+h2{font-size:32px}
+.wrap .muted{font-size:26px}
+
+/* LETRAS GRANDES NAS ABAS INTERNAS */
+.wrap{
+    font-size:24px;
+}
+
+.wrap .card{
+    font-size:24px;
+    line-height:1.35;
+}
+
+.wrap a.btn,
+.wrap button{
+    font-size:22px;
+    font-weight:700;
+    padding:16px 20px;
+    min-height:54px;
+}
+
+.wrap table{
+    font-size:24px;
+}
+
+.wrap th,
+.wrap td{
+    font-size:24px;
+}
+
+.wrap .pill{
+    font-size:21px;
+}
+
+.wrap p{
+    font-size:24px;
+    line-height:1.4;
+}
+
+/* NÃO ALTERAR O MENU PRINCIPAL */
+.nav-wrap,
+.nav-wrap .nav{
+    font-size:initial;
+}
+
+/* AVALIAÇÕES CONTINUAM COM CSS PRÓPRIO */
+.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
 @media(max-width:760px){
   .wrap{padding:14px}.top{padding:14px 16px}.big{font-size:24px}
   .nav-wrap{padding:28px 16px 16px}
@@ -174,6 +221,31 @@ h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{backgroun
   .nav-arrow{font-size:58px}
   th:nth-child(n+4),td:nth-child(n+4){display:none}
 }
+
+/* MOBILE INTERNO 1 COLUNA */
+@media (max-width:700px){
+
+    /* Nas páginas internas, grids passam para uma coluna */
+    .wrap > .grid,
+    .wrap .grid:not(.nav){
+        grid-template-columns:1fr !important;
+    }
+
+    /* Cartões aproveitam a largura do celular */
+    .wrap .card{
+        width:auto !important;
+        max-width:none !important;
+    }
+
+    /* Campos permanecem confortáveis */
+    .wrap input,
+    .wrap select,
+    .wrap textarea{
+        width:100% !important;
+        box-sizing:border-box;
+    }
+}
+
 </style></head><body>
 <div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block"></div><div>{{session.get('nome','')}}</div></div>
 {% if session.get('uid') and request.path == '/' %}
@@ -263,7 +335,29 @@ def dashboard():
     ac=con.cursor().execute("SELECT * FROM academias WHERE id=%s",(aid(),)).fetchone()
     con.close()
     return page("Painel","""
-    <h1>{{ac.nome}}</h1><p class="muted">Visão geral da academia · Plano {{ac.plano}}</p>
+    <style>
+.painel-area .muted{
+    font-size:26px;
+}
+.painel-area .big{
+    font-size:38px;
+    font-weight:800;
+}
+.painel-area .card{
+    padding:22px;
+}
+.painel-area a.btn{
+    font-size:24px;
+    font-weight:700;
+    padding:18px 22px;
+    min-height:62px;
+    display:flex;
+    align-items:center;
+}
+</style>
+
+<div class="painel-area">
+<h1>{{ac.nome}}</h1><p class="muted">Visão geral da academia · Plano {{ac.plano}}</p>
     <div class="grid">
       <div class="card"><div class="muted">Alunos ativos</div><div class="big">{{s.alunos}}</div></div>
       <div class="card"><div class="muted">Check-ins hoje</div><div class="big">{{s.checkins}}</div></div>
@@ -272,6 +366,7 @@ def dashboard():
     </div><br>
     <div class="grid"><a class="btn green" href="/alunos/novo">+ Novo aluno</a>
     <a class="btn" href="/checkin">✓ Fazer check-in</a><a class="btn" href="/financeiro">R$ Registrar pagamento</a></div>
+</div>
     """,s=stats,ac=ac)
 
 @app.route("/alunos")
@@ -1971,4 +2066,4 @@ def config():
 init_db()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)), debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5001)), debug=False)
