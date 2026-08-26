@@ -305,12 +305,19 @@ def login():
             return redirect("/")
         erro="E-mail ou senha inválidos."
     return page("Entrar","""
-    <div class="card" style="max-width:430px;margin:7vh auto"><h1>Entrar</h1>
-    <p class="muted">Gestão completa para academias.</p>
-    {% if erro %}<p style="color:#dc2626">{{erro}}</p>{% endif %}
-    <form method="post"><label>E-mail</label><input name="email" type="email" required value="admin@tatameone.local">
-    <label>Senha</label><input name="senha" type="password" required value="1234">
-    <button class="green" style="width:100%">Entrar</button></form></div>""", erro=erro)
+    <div class="card" style="max-width:620px;width:92%;margin:7vh auto;padding:32px;border-radius:24px">
+    <h1 style="font-size:46px;margin-bottom:22px">Entrar</h1>
+    <p class="muted" style="font-size:27px;margin-bottom:28px">Gestão completa para academias.</p>
+    {% if erro %}<p style="color:#dc2626;font-size:24px">{{erro}}</p>{% endif %}
+    <form method="post">
+    <label style="font-size:28px">E-mail</label>
+    <input name="email" type="email" required value="admin@tatameone.local"
+           style="font-size:27px;padding:18px;min-height:66px;margin-bottom:22px">
+    <label style="font-size:28px">Senha</label>
+    <input name="senha" type="password" required value="1234"
+           style="font-size:27px;padding:18px;min-height:66px;margin-bottom:26px">
+    <button class="green" style="width:100%;font-size:28px;font-weight:800;min-height:70px;border-radius:14px">Entrar</button>
+    </form></div>""", erro=erro)
 
 @app.route("/logout")
 def logout():
