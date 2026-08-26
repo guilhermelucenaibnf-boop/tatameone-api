@@ -1661,12 +1661,12 @@ def avaliacoes():
     }
 
     .avaliacoes-layout h2{
-        font-size:34px;
+        font-size:44px;
         margin:18px 0 24px;
     }
 
     .avaliacoes-layout label{
-        font-size:22px;
+        font-size:32px;
         font-weight:700;
         display:block;
         margin-top:12px;
@@ -1691,7 +1691,7 @@ def avaliacoes():
     }
 
     .avaliacoes-layout p{
-        font-size:24px;
+        font-size:30px;
         line-height:1.35;
     }
 
