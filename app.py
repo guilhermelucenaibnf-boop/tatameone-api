@@ -148,14 +148,14 @@ BASE = """
 .wrap{max-width:1150px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .card{background:white;border-radius:16px;padding:16px;box-shadow:0 2px 12px #00000010}
 .big{font-size:28px;font-weight:800}.muted{color:#6b7280}
-.nav-wrap{max-width:1150px;margin:auto;padding:14px 18px 0}
-.nav{display:grid;grid-template-columns:1fr;gap:16px}
-.nav a.btn{min-height:140px;border-radius:24px;padding:24px 22px;display:flex;align-items:center;gap:18px;text-align:left;box-shadow:0 4px 18px #00000018}
-.nav-icon{font-size:58px;line-height:1;width:74px;text-align:center;flex:0 0 74px}
+.nav-wrap{max-width:1150px;margin:auto;padding:28px 16px 0}
+.nav{display:grid;grid-template-columns:1fr;gap:26px}
+.nav a.btn{min-height:216px;border-radius:36px;padding:38px 42px;display:flex;align-items:center;gap:34px;text-align:left;box-shadow:0 4px 18px #00000018}
+.nav-icon{font-size:92px;line-height:1;width:104px;text-align:center;flex:0 0 104px}
 .nav-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.nav-title{font-size:30px;font-weight:800;line-height:1.1}
-.nav-desc{font-size:17px;color:#6b7280;font-weight:400;line-height:1.3}
-.nav-arrow{font-size:50px;font-weight:800;color:#16a34a}
+.nav-title{font-size:46px;font-weight:800;line-height:1.1}
+.nav-desc{font-size:27px;color:#6b7280;font-weight:400;line-height:1.3}
+.nav-arrow{font-size:58px;font-weight:800;color:#16a34a}
 .nav a.danger .nav-desc,.nav a.danger .nav-arrow{color:#fee2e2}
 a.btn,button{border:0;border-radius:10px;padding:11px 14px;background:#111827;color:white;text-decoration:none;cursor:pointer}
 a.green,button.green{background:#16a34a} a.light{background:white;color:#111827;border:1px solid #ddd}
@@ -165,13 +165,13 @@ th,td{text-align:left;padding:10px;border-bottom:1px solid #eee}.pill{padding:5p
 h1{margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
 @media(max-width:760px){
   .wrap{padding:14px}.top{padding:14px 16px}.big{font-size:24px}
-  .nav-wrap{padding:16px 10px 10px}
+  .nav-wrap{padding:28px 16px 16px}
   .nav{grid-template-columns:1fr;gap:16px}
-  .nav a.btn{min-height:140px;padding:24px 22px;border-radius:24px}
-  .nav-icon{font-size:58px;width:74px;flex-basis:74px}
-  .nav-title{font-size:30px}
-  .nav-desc{font-size:17px}
-  .nav-arrow{font-size:50px}
+  .nav a.btn{min-height:216px;padding:38px 42px;border-radius:36px}
+  .nav-icon{font-size:92px;width:104px;flex-basis:104px}
+  .nav-title{font-size:46px}
+  .nav-desc{font-size:27px}
+  .nav-arrow{font-size:58px}
   th:nth-child(n+4),td:nth-child(n+4){display:none}
 }
 </style></head><body>
