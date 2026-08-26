@@ -149,7 +149,7 @@ BASE = """
 .card{background:white;border-radius:16px;padding:16px;box-shadow:0 2px 12px #00000010}
 .big{font-size:28px;font-weight:800}.muted{color:#6b7280}
 .nav-wrap{max-width:1150px;margin:auto;padding:14px 18px 0}
-.nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.nav{display:grid;grid-template-columns:1fr;gap:16px}
 .nav a.btn{min-height:120px;border-radius:22px;padding:20px 22px;display:flex;align-items:center;gap:18px;text-align:left;box-shadow:0 4px 18px #00000018}
 .nav-icon{font-size:48px;line-height:1;width:64px;text-align:center;flex:0 0 64px}
 .nav-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
