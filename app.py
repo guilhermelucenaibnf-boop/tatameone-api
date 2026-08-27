@@ -2469,6 +2469,15 @@ def aulas():
 
           </form>
 
+          <form method="post"
+                action="/aulas/{{x.id}}/excluir"
+                style="margin:0"
+                onsubmit="return confirm('Excluir esta aula definitivamente?');">
+            <button type="submit" class="danger">
+              🗑️ Excluir
+            </button>
+          </form>
+
         </div>
       </div>
     {% else %}
@@ -2841,6 +2850,32 @@ def aula_status(id):
             (novo_status,id,aid())
         )
 
+        con.commit()
+
+    con.close()
+
+    return redirect("/aulas")
+
+
+@app.route("/aulas/<int:id>/excluir", methods=["POST"])
+@login_required
+@permissao_required("aulas")
+def aula_excluir(id):
+    con = db()
+
+    aula = con.cursor().execute(
+        """SELECT id
+           FROM aulas
+           WHERE id=%s AND academia_id=%s""",
+        (id, aid())
+    ).fetchone()
+
+    if aula:
+        con.cursor().execute(
+            """DELETE FROM aulas
+               WHERE id=%s AND academia_id=%s""",
+            (id, aid())
+        )
         con.commit()
 
     con.close()
@@ -3414,6 +3449,15 @@ def usuarios():
 
             </form>
 
+            <form method="post"
+                  action="/usuarios/{{u.id}}/excluir"
+                  style="margin:0"
+                  onsubmit="return confirm('Excluir este usuário definitivamente?');">
+              <button type="submit" class="danger">
+                🗑️ Excluir
+              </button>
+            </form>
+
           </div>
           {% endif %}
 
@@ -3660,6 +3704,46 @@ def usuario_status(id):
     con.commit()
     con.close()
 
+    return redirect("/usuarios")
+
+
+@app.route("/usuarios/<int:id>/excluir", methods=["POST"])
+@login_required
+def usuario_excluir(id):
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Apenas o dono da academia pode excluir usuários.")
+        return redirect("/")
+
+    con = db()
+
+    u = con.cursor().execute(
+        """SELECT id,perfil
+           FROM usuarios
+           WHERE id=%s AND academia_id=%s""",
+        (id, aid())
+    ).fetchone()
+
+    if not u:
+        con.close()
+        return redirect("/usuarios")
+
+    if str(u["perfil"]).upper() == "DONO":
+        con.close()
+        flash("O usuário DONO é protegido e não pode ser excluído.")
+        return redirect("/usuarios")
+
+    con.cursor().execute(
+        """DELETE FROM usuarios
+           WHERE id=%s
+           AND academia_id=%s
+           AND upper(perfil) <> 'DONO'""",
+        (id, aid())
+    )
+
+    con.commit()
+    con.close()
+
+    flash("Usuário excluído com sucesso.")
     return redirect("/usuarios")
 
 
