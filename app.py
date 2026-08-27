@@ -118,6 +118,20 @@ def init_db():
         )
 
 
+    # Configuração PIX individual de cada academia.
+    colunas_pix = [
+        ("pix_ativo", "INTEGER DEFAULT 0"),
+        ("pix_tipo_chave", "TEXT"),
+        ("pix_chave", "TEXT"),
+        ("pix_nome", "TEXT"),
+        ("pix_cidade", "TEXT")
+    ]
+
+    for nome_coluna, tipo_coluna in colunas_pix:
+        cur.execute(
+            f"ALTER TABLE academias ADD COLUMN IF NOT EXISTS {nome_coluna} {tipo_coluna}"
+        )
+
     # Permissões individuais por usuário.
     # NULL = usar as permissões padrão do perfil.
     cur.execute("""
@@ -2321,6 +2335,311 @@ def plano_excluir(id):
     return redirect("/planos")
 
 
+
+# ============================================================
+# PIX BR CODE / QR CODE
+# ============================================================
+
+def pix_campo(id_campo, valor):
+    valor = str(valor or "")
+    return f"{id_campo}{len(valor):02d}{valor}"
+
+
+def pix_limpar_texto(texto, limite):
+    import unicodedata
+
+    texto = str(texto or "").strip().upper()
+
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(
+        c for c in texto
+        if unicodedata.category(c) != "Mn"
+    )
+
+    permitido = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-"
+    texto = "".join(c for c in texto if c in permitido)
+
+    return texto[:limite]
+
+
+def pix_crc16(payload):
+    polinomio = 0x1021
+    resultado = 0xFFFF
+
+    for byte in payload.encode("utf-8"):
+        resultado ^= byte << 8
+
+        for _ in range(8):
+            if resultado & 0x8000:
+                resultado = (
+                    (resultado << 1) ^ polinomio
+                ) & 0xFFFF
+            else:
+                resultado = (resultado << 1) & 0xFFFF
+
+    return f"{resultado:04X}"
+
+
+def gerar_pix_payload(chave, nome, cidade, valor, txid="***"):
+
+    chave = str(chave or "").strip()
+    nome = pix_limpar_texto(nome, 25)
+    cidade = pix_limpar_texto(cidade, 15)
+
+    try:
+        valor = float(valor)
+    except (ValueError, TypeError):
+        valor = 0
+
+    gui = pix_campo("00", "BR.GOV.BCB.PIX")
+    chave_pix = pix_campo("01", chave)
+
+    merchant_account = pix_campo(
+        "26",
+        gui + chave_pix
+    )
+
+    payload = (
+        pix_campo("00", "01") +
+        merchant_account +
+        pix_campo("52", "0000") +
+        pix_campo("53", "986")
+    )
+
+    if valor > 0:
+        payload += pix_campo(
+            "54",
+            f"{valor:.2f}"
+        )
+
+    payload += (
+        pix_campo("58", "BR") +
+        pix_campo("59", nome or "RECEBEDOR") +
+        pix_campo("60", cidade or "BRASIL") +
+        pix_campo(
+            "62",
+            pix_campo("05", txid)
+        )
+    )
+
+    payload_crc = payload + "6304"
+    return payload_crc + pix_crc16(payload_crc)
+
+
+@app.route("/financeiro/pix-cobranca")
+@login_required
+@permissao_required("financeiro")
+def financeiro_pix_cobranca():
+
+    valor = request.args.get("valor", "0")
+    aluno_id = request.args.get("aluno_id", "")
+    referencia = request.args.get("referencia", "")
+
+    con = db()
+
+    academia = con.cursor().execute("""
+        SELECT *
+        FROM academias
+        WHERE id=%s
+        LIMIT 1
+    """, (aid(),)).fetchone()
+
+    aluno = None
+
+    if aluno_id:
+        aluno = con.cursor().execute("""
+            SELECT id,nome
+            FROM alunos
+            WHERE id=%s
+              AND academia_id=%s
+            LIMIT 1
+        """, (aluno_id, aid())).fetchone()
+
+    con.close()
+
+    if not academia:
+        return redirect("/financeiro")
+
+    if not academia["pix_ativo"]:
+        flash("O PIX não está ativado nas Configurações.")
+        return redirect("/financeiro")
+
+    if not academia["pix_chave"]:
+        flash("Cadastre a chave PIX nas Configurações.")
+        return redirect("/financeiro")
+
+    try:
+        valor_float = float(
+            str(valor).replace(",", ".")
+        )
+    except (ValueError, TypeError):
+        valor_float = 0
+
+    if valor_float <= 0:
+        flash("Informe um valor válido para gerar o PIX.")
+        return redirect("/financeiro")
+
+    payload = gerar_pix_payload(
+        academia["pix_chave"],
+        academia["pix_nome"] or academia["nome"],
+        academia["pix_cidade"] or "BRASIL",
+        valor_float
+    )
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=3
+    )
+
+    qr.add_data(payload)
+    qr.make(fit=True)
+
+    img = qr.make_image(
+        fill_color="black",
+        back_color="white"
+    )
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+
+    qr_base64 = base64.b64encode(
+        buffer.getvalue()
+    ).decode("ascii")
+
+    return page("Pagamento PIX", """
+    <h1>💳 Pagamento PIX</h1>
+
+    <div class="card"
+         style="max-width:520px;margin:auto;text-align:center">
+
+        <h2>{{academia.nome}}</h2>
+
+        {% if aluno %}
+        <p>
+            <b>Aluno:</b>
+            {{aluno.nome}}
+        </p>
+        {% endif %}
+
+        {% if referencia %}
+        <p>
+            <b>Mensalidade:</b>
+            {{referencia}}
+        </p>
+        {% endif %}
+
+        <div class="big">
+            R$ {{'%.2f'|format(valor)}}
+        </div>
+
+        <p class="muted">
+            Escaneie o QR Code com o aplicativo do banco
+        </p>
+
+        <img
+            src="data:image/png;base64,{{qr_base64}}"
+            alt="QR Code PIX"
+            style="
+                width:100%;
+                max-width:320px;
+                background:white;
+                padding:10px;
+                border-radius:12px;
+            ">
+
+        <h3>PIX Copia e Cola</h3>
+
+        <textarea
+            id="pixPayload"
+            readonly
+            style="
+                width:100%;
+                min-height:130px;
+                font-size:13px;
+                box-sizing:border-box;
+            ">{{payload}}</textarea>
+
+        <button
+            type="button"
+            class="green"
+            onclick="copiarPix()"
+            style="width:100%;margin-top:10px">
+            📋 Copiar código PIX
+        </button>
+
+        <div id="copiado"
+             style="
+                display:none;
+                margin-top:10px;
+                font-weight:bold;
+            ">
+            ✅ Código PIX copiado
+        </div>
+
+        <p style="margin-top:20px">
+            <b>Chave PIX:</b><br>
+            {{academia.pix_chave}}
+        </p>
+
+        <p class="muted">
+            Após confirmar o recebimento no banco,
+            volte ao Financeiro e registre o pagamento.
+        </p>
+
+        <a
+            class="btn green"
+            href="/financeiro"
+            style="
+                display:block;
+                text-align:center;
+                text-decoration:none;
+                margin-top:15px;
+            ">
+            ← Voltar e registrar pagamento
+        </a>
+
+    </div>
+
+    <script>
+    function copiarPix(){
+
+        const campo =
+            document.getElementById("pixPayload");
+
+        if(navigator.clipboard &&
+           navigator.clipboard.writeText){
+
+            navigator.clipboard
+                .writeText(campo.value)
+                .then(function(){
+                    document.getElementById(
+                        "copiado"
+                    ).style.display="block";
+                });
+
+        }else{
+
+            campo.select();
+            document.execCommand("copy");
+
+            document.getElementById(
+                "copiado"
+            ).style.display="block";
+        }
+    }
+    </script>
+    """,
+    academia=academia,
+    aluno=aluno,
+    referencia=referencia,
+    valor=valor_float,
+    payload=payload,
+    qr_base64=qr_base64)
+
+
+
 @app.route("/financeiro", methods=["GET","POST"])
 @login_required
 @permissao_required("financeiro")
@@ -2488,7 +2807,57 @@ def financeiro():
             <option>BOLETO</option>
           </select>
 
-          <button class="green">Registrar</button>
+          <button class="green" type="submit">
+            ✅ Registrar pagamento
+          </button>
+
+          <button
+            type="button"
+            onclick="gerarPixFinanceiro(this.form)"
+            style="
+                width:100%;
+                margin-top:10px;
+                min-height:52px;
+                font-size:17px;
+                font-weight:bold;
+            ">
+            💳 GERAR PIX / QR CODE
+          </button>
+
+          <script>
+          function gerarPixFinanceiro(form){
+
+              const aluno =
+                  form.querySelector('[name="aluno_id"]').value;
+
+              const referencia =
+                  form.querySelector('[name="referencia"]').value;
+
+              const valor =
+                  form.querySelector('[name="valor"]').value;
+
+              const forma =
+                  form.querySelector('[name="forma"]').value;
+
+              if(!valor || parseFloat(valor) <= 0){
+                  alert("Informe o valor da mensalidade.");
+                  return;
+              }
+
+              if(forma !== "PIX"){
+                  alert("Selecione PIX como forma de pagamento.");
+                  return;
+              }
+
+              const url =
+                  "/financeiro/pix-cobranca" +
+                  "?aluno_id=" + encodeURIComponent(aluno) +
+                  "&referencia=" + encodeURIComponent(referencia) +
+                  "&valor=" + encodeURIComponent(valor);
+
+              window.location.href = url;
+          }
+          </script>
 
         </form>
       </div>
@@ -2505,6 +2874,12 @@ def financeiro():
                 {{p.referencia}} · {{p.forma}} · {{p.pago_em}}
               </span>
             </p>
+
+            <a href="/financeiro/{{p.id}}/comprovante"
+               class="btn green"
+               style="display:inline-block;margin:5px 8px 5px 0;text-decoration:none">
+              🧾 Comprovante
+            </a>
 
             <form method="post"
                   action="/financeiro/{{p.id}}/excluir"
@@ -2534,6 +2909,326 @@ def financeiro():
     referencia_atual=f"{hoje.month:02d}/{hoje.year}",
     msg=msg)
 
+
+
+
+@app.route("/financeiro/<int:id>/comprovante")
+@login_required
+@permissao_required("financeiro")
+def financeiro_comprovante(id):
+    con = db()
+
+    pagamento = con.cursor().execute("""
+        SELECT
+            p.*,
+            a.nome AS aluno_nome
+        FROM pagamentos p
+        JOIN alunos a
+          ON a.id = p.aluno_id
+         AND a.academia_id = p.academia_id
+        WHERE p.id=%s
+          AND p.academia_id=%s
+        LIMIT 1
+    """, (id, aid())).fetchone()
+
+    academia = con.cursor().execute("""
+        SELECT *
+        FROM academias
+        WHERE id=%s
+        LIMIT 1
+    """, (aid(),)).fetchone()
+
+    con.close()
+
+    if not pagamento:
+        flash("Comprovante não encontrado.")
+        return redirect("/financeiro")
+
+    return page("Comprovante", """
+<style>
+
+.recibo-wrap{
+    max-width:430px;
+    margin:0 auto;
+}
+
+.recibo{
+    background:white;
+    color:#000;
+    padding:18px;
+    border:2px dashed #777;
+    font-family:Arial,sans-serif;
+}
+
+.recibo-cabecalho{
+    text-align:center;
+}
+
+.recibo-cabecalho h2{
+    margin:4px 0;
+    font-size:22px;
+}
+
+.recibo-titulo{
+    font-weight:900;
+    font-size:16px;
+    margin-top:10px;
+}
+
+.recibo-linha{
+    border-top:1px dashed #555;
+    margin:14px 0;
+}
+
+.recibo-info{
+    line-height:1.8;
+    font-size:15px;
+}
+
+.recibo-valor{
+    text-align:center;
+    font-size:30px;
+    font-weight:900;
+    margin:15px 0;
+}
+
+.recibo-final{
+    text-align:center;
+    font-size:14px;
+}
+
+.acoes-recibo{
+    max-width:430px;
+    margin:18px auto;
+}
+
+.acoes-recibo button,
+.acoes-recibo a{
+    display:block;
+    width:100%;
+    box-sizing:border-box;
+    text-align:center;
+    text-decoration:none;
+    margin:10px 0;
+    min-height:52px;
+    font-size:17px;
+    font-weight:bold;
+}
+
+@media print{
+
+    @page{
+        size:58mm auto;
+        margin:2mm;
+    }
+
+    body{
+        margin:0 !important;
+        padding:0 !important;
+        background:white !important;
+    }
+
+    body *{
+        visibility:hidden !important;
+    }
+
+    #recibo,
+    #recibo *{
+        visibility:visible !important;
+    }
+
+    #recibo{
+        position:absolute;
+        left:0;
+        top:0;
+        width:54mm !important;
+        max-width:54mm !important;
+        box-sizing:border-box;
+        margin:0 !important;
+        padding:2mm !important;
+        border:0 !important;
+        font-family:monospace !important;
+        font-size:10px !important;
+    }
+
+    #recibo h2{
+        font-size:15px !important;
+    }
+
+    #recibo .recibo-titulo{
+        font-size:11px !important;
+    }
+
+    #recibo .recibo-info{
+        font-size:10px !important;
+        line-height:1.5 !important;
+    }
+
+    #recibo .recibo-valor{
+        font-size:18px !important;
+    }
+
+    #recibo .recibo-final{
+        font-size:9px !important;
+    }
+
+    .acoes-recibo{
+        display:none !important;
+    }
+}
+
+</style>
+
+<div class="recibo-wrap">
+
+<div id="recibo" class="recibo">
+
+    <div class="recibo-cabecalho">
+
+        <h2>{{ academia.nome }}</h2>
+
+        {% if academia.documento %}
+        <div>{{ academia.documento }}</div>
+        {% endif %}
+
+        {% if academia.telefone %}
+        <div>{{ academia.telefone }}</div>
+        {% endif %}
+
+        {% if academia.endereco %}
+        <div>{{ academia.endereco }}</div>
+        {% endif %}
+
+        <div class="recibo-titulo">
+            COMPROVANTE DE PAGAMENTO
+        </div>
+
+    </div>
+
+    <div class="recibo-linha"></div>
+
+    <div class="recibo-info">
+
+        <b>Comprovante:</b>
+        #{{ pagamento.id }}
+        <br>
+
+        <b>Aluno:</b>
+        {{ pagamento.aluno_nome }}
+        <br>
+
+        <b>Mensalidade:</b>
+        {{ pagamento.referencia }}
+        <br>
+
+        <b>Forma:</b>
+        {{ pagamento.forma }}
+        <br>
+
+        <b>Data/Hora:</b>
+        {{ pagamento.pago_em }}
+
+    </div>
+
+    <div class="recibo-linha"></div>
+
+    <div class="recibo-valor">
+        R$ {{ '%.2f'|format(pagamento.valor) }}
+    </div>
+
+    <div class="recibo-linha"></div>
+
+    <div class="recibo-final">
+        PAGAMENTO RECEBIDO
+        <br><br>
+        Obrigado!
+        <br>
+        Sistema TatameOne
+    </div>
+
+</div>
+
+</div>
+
+<div class="acoes-recibo">
+
+    <button class="green"
+            type="button"
+            onclick="window.print()">
+        🖨️ Imprimir comprovante
+    </button>
+
+    <button type="button"
+            onclick="imprimirBluetooth()">
+        📱 Impressora Bluetooth
+    </button>
+
+    <a class="btn"
+       href="/financeiro">
+        ← Voltar ao Financeiro
+    </a>
+
+</div>
+
+<script>
+
+function textoComprovante(){
+
+    return [
+        "{{ academia.nome|e }}",
+        "COMPROVANTE DE PAGAMENTO",
+        "------------------------------",
+        "Comprovante: #{{ pagamento.id }}",
+        "Aluno: {{ pagamento.aluno_nome|e }}",
+        "Mensalidade: {{ pagamento.referencia|e }}",
+        "Forma: {{ pagamento.forma|e }}",
+        "Data/Hora: {{ pagamento.pago_em|e }}",
+        "------------------------------",
+        "R$ {{ '%.2f'|format(pagamento.valor) }}",
+        "------------------------------",
+        "PAGAMENTO RECEBIDO",
+        "",
+        "Obrigado!",
+        "Sistema TatameOne",
+        "",
+        "",
+        ""
+    ].join("\\n");
+
+}
+
+function imprimirBluetooth(){
+
+    const texto = textoComprovante();
+
+    try{
+
+        const bytes =
+            new TextEncoder().encode(texto);
+
+        let binario = "";
+
+        bytes.forEach(function(b){
+            binario += String.fromCharCode(b);
+        });
+
+        const base64 = btoa(binario);
+
+        window.location.href =
+            "rawbt:base64," + base64;
+
+    }catch(erro){
+
+        window.print();
+
+    }
+
+}
+
+</script>
+""",
+    pagamento=pagamento,
+    academia=academia)
 
 
 @app.route("/financeiro/<int:id>/excluir", methods=["POST"])
@@ -4456,8 +5151,32 @@ def config():
     con=db()
     if request.method=="POST":
         f=request.form
-        con.cursor().execute("""UPDATE academias SET nome=%s,documento=%s,telefone=%s,endereco=%s,cor=%s WHERE id=%s""",
-                    (f["nome"],f.get("documento"),f.get("telefone"),f.get("endereco"),f.get("cor"),aid()))
+        con.cursor().execute("""
+            UPDATE academias
+            SET nome=%s,
+                documento=%s,
+                telefone=%s,
+                endereco=%s,
+                cor=%s,
+                pix_ativo=%s,
+                pix_tipo_chave=%s,
+                pix_chave=%s,
+                pix_nome=%s,
+                pix_cidade=%s
+            WHERE id=%s
+        """,(
+            f["nome"],
+            f.get("documento"),
+            f.get("telefone"),
+            f.get("endereco"),
+            f.get("cor"),
+            1 if f.get("pix_ativo") else 0,
+            f.get("pix_tipo_chave"),
+            f.get("pix_chave","").strip(),
+            f.get("pix_nome","").strip(),
+            f.get("pix_cidade","").strip().upper(),
+            aid()
+        ))
         con.commit()
     ac=con.cursor().execute("SELECT * FROM academias WHERE id=%s",(aid(),)).fetchone()
     mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
@@ -4466,7 +5185,50 @@ def config():
     <h1>Configurações</h1><div class="grid"><div class="card"><h2>Academia</h2><form method="post">
     <label>Nome</label><input name="nome" value="{{ac.nome}}" required><label>CNPJ/CPF</label><input name="documento" value="{{ac.documento or ''}}">
     <label>Telefone</label><input name="telefone" value="{{ac.telefone or ''}}"><label>Endereço</label><input name="endereco" value="{{ac.endereco or ''}}">
-    <label>Cor principal</label><input type="color" name="cor" value="{{ac.cor or '#111827'}}"><button class="green">Salvar</button></form></div>
+    <label>Cor principal</label>
+    <input type="color" name="cor" value="{{ac.cor or '#111827'}}">
+
+    <hr style="margin:28px 0">
+
+    <h2>💳 PIX</h2>
+    <p class="muted">Configure o PIX utilizado para receber as mensalidades desta academia.</p>
+
+    <label style="display:flex;align-items:center;gap:10px;margin:15px 0">
+        <input type="checkbox"
+               name="pix_ativo"
+               value="1"
+               style="width:24px;height:24px"
+               {% if ac.pix_ativo %}checked{% endif %}>
+        <b>Ativar recebimentos por PIX</b>
+    </label>
+
+    <label>Tipo da chave PIX</label>
+    <select name="pix_tipo_chave">
+        <option value="">Selecione</option>
+        <option value="CPF" {% if ac.pix_tipo_chave=='CPF' %}selected{% endif %}>CPF</option>
+        <option value="CNPJ" {% if ac.pix_tipo_chave=='CNPJ' %}selected{% endif %}>CNPJ</option>
+        <option value="CELULAR" {% if ac.pix_tipo_chave=='CELULAR' %}selected{% endif %}>Celular</option>
+        <option value="EMAIL" {% if ac.pix_tipo_chave=='EMAIL' %}selected{% endif %}>E-mail</option>
+        <option value="ALEATORIA" {% if ac.pix_tipo_chave=='ALEATORIA' %}selected{% endif %}>Chave aleatória</option>
+    </select>
+
+    <label>Chave PIX</label>
+    <input name="pix_chave"
+           value="{{ac.pix_chave or ''}}"
+           placeholder="Digite a chave PIX">
+
+    <label>Nome do recebedor</label>
+    <input name="pix_nome"
+           value="{{ac.pix_nome or ''}}"
+           placeholder="Nome do titular">
+
+    <label>Cidade</label>
+    <input name="pix_cidade"
+           value="{{ac.pix_cidade or ''}}"
+           placeholder="Ex.: RIO DE JANEIRO">
+
+    <button class="green">💾 Salvar configurações</button>
+    </form></div>
     <div class="card"><h2>Modalidades disponíveis</h2>{% for m in mods %}<span class="pill">{{m.nome}}</span> {% endfor %}
     <p class="muted">A estrutura aceita modalidades diferentes por academia.</p>
     <h3>Plano do sistema</h3><p>{{ac.plano}}</p>
