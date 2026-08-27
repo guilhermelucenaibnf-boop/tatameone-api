@@ -572,6 +572,7 @@ def cadastro_publico(academia_id):
 
 @app.route("/alunos/pre-cadastro/<int:id>/aprovar")
 @login_required
+@permissao_required("alunos")
 def aprovar_pre_cadastro(id):
     con=db()
     p=con.cursor().execute("SELECT * FROM pre_cadastros WHERE id=%s AND academia_id=%s AND status='PENDENTE'",(id,aid())).fetchone()
@@ -590,6 +591,7 @@ def aprovar_pre_cadastro(id):
 
 @app.route("/alunos/pre-cadastro/<int:id>/recusar")
 @login_required
+@permissao_required("alunos")
 def recusar_pre_cadastro(id):
     con=db()
     con.cursor().execute("UPDATE pre_cadastros SET status='RECUSADO' WHERE id=%s AND academia_id=%s",(id,aid()))
@@ -811,6 +813,7 @@ function preencherEmergencia(tipo) {
 
 @app.route("/alunos/<int:id>")
 @login_required
+@permissao_required("alunos")
 def aluno(id):
     con=db()
     x=con.cursor().execute(
@@ -1036,6 +1039,7 @@ def aluno(id):
 
 @app.route("/alunos/<int:id>/desativar", methods=["POST"])
 @login_required
+@permissao_required("alunos")
 def aluno_desativar(id):
     con=db()
     con.cursor().execute(
@@ -1049,6 +1053,7 @@ def aluno_desativar(id):
 
 @app.route("/alunos/<int:id>/reativar", methods=["POST"])
 @login_required
+@permissao_required("alunos")
 def aluno_reativar(id):
     con=db()
     con.cursor().execute(
@@ -1062,6 +1067,7 @@ def aluno_reativar(id):
 
 @app.route("/alunos/<int:id>/excluir", methods=["POST"])
 @login_required
+@permissao_required("alunos")
 def aluno_excluir(id):
     con=db()
 
@@ -1350,6 +1356,7 @@ def checkin():
 
 @app.route("/checkin/<int:id>/excluir", methods=["POST"])
 @login_required
+@permissao_required("checkin")
 def checkin_excluir(id):
     con=db()
 
@@ -1409,6 +1416,7 @@ def planos():
 
 @app.route("/planos/<int:id>/excluir", methods=["POST"])
 @login_required
+@permissao_required("planos")
 def plano_excluir(id):
     con=db()
 
@@ -1645,6 +1653,7 @@ def financeiro():
 
 @app.route("/financeiro/<int:id>/excluir", methods=["POST"])
 @login_required
+@permissao_required("financeiro")
 def financeiro_excluir(id):
     con=db()
 
@@ -3078,6 +3087,7 @@ def avaliacoes():
 
 @app.route("/avaliacoes/<int:id>/excluir", methods=["POST"])
 @login_required
+@permissao_required("avaliacoes")
 def avaliacao_excluir(id):
     con=db()
 
