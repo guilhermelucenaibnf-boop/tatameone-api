@@ -269,13 +269,60 @@ h2{font-size:32px}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.danger{background:#dc2626!important}
 @media(max-width:760px){
   .wrap{padding:14px}.top{padding:14px 16px}.big{font-size:24px}
-  .nav-wrap{padding:28px 16px 16px}
-  .nav{grid-template-columns:1fr;gap:16px}
-  .nav a.btn{min-height:195px;padding:32px 34px;border-radius:34px}
-  .nav-icon{font-size:82px;width:92px;flex-basis:92px}
-  .nav-title{font-size:42px}
-  .nav-desc{font-size:24px}
-  .nav-arrow{font-size:48px}
+
+  /* MENU PRINCIPAL RESPONSIVO PARA CHROME E APK */
+  .nav-wrap{
+    width:100%;
+    max-width:100%;
+    padding:18px 10px 16px;
+    overflow-x:hidden;
+  }
+
+  .nav{
+    width:100%;
+    max-width:100%;
+    grid-template-columns:minmax(0,1fr);
+    gap:16px;
+  }
+
+  .nav a.btn{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    min-height:170px;
+    padding:26px 22px;
+    border-radius:28px;
+    gap:20px;
+    overflow:hidden;
+  }
+
+  .nav-icon{
+    font-size:68px;
+    width:76px;
+    flex:0 0 76px;
+  }
+
+  .nav-copy{
+    min-width:0;
+    overflow:hidden;
+  }
+
+  .nav-title{
+    font-size:36px;
+    max-width:100%;
+  }
+
+  .nav-desc{
+    font-size:21px;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+
+  .nav-arrow{
+    font-size:42px;
+    flex:0 0 auto;
+  }
+
   th:nth-child(n+4),td:nth-child(n+4){display:none}
 }
 
