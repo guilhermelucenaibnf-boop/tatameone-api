@@ -111,14 +111,7 @@ def init_db():
             f"ALTER TABLE avaliacoes ADD COLUMN IF NOT EXISTS {nome_coluna} {tipo_coluna}"
         )
 
-    cur.execute("SELECT COUNT(*) AS n FROM academias")
-    if cur.fetchone()["n"]==0:
-        cur.execute("INSERT INTO academias(nome,plano,criado_em) VALUES(%s,%s,%s) RETURNING id",("TatameOne Demonstração","PREMIUM",agora()))
-        academia_inicial=cur.fetchone()["id"]
-        cur.execute("INSERT INTO usuarios(academia_id,nome,email,senha,perfil,criado_em) VALUES(%s,%s,%s,%s,%s,%s)",(academia_inicial,"Administrador","admin@tatameone.local","1234","DONO",agora()))
-        for m in ("Musculação","Jiu-Jítsu","Muay Thai","Boxe","Funcional","Cross Training","Pilates","Yoga","Dança","Natação","Personal"):
-            cur.execute("INSERT INTO modalidades(academia_id,nome) VALUES(%s,%s)",(academia_inicial,m))
-        cur.execute("INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao) VALUES(%s,%s,%s,%s,%s)",(academia_inicial,"Plano Gratuito",0,"MENSAL","Plano sem cobrança"))
+
     # Permissões individuais por usuário.
     # NULL = usar as permissões padrão do perfil.
     cur.execute("""
@@ -410,8 +403,142 @@ def public_page(title, body, ac, **ctx):
     inner=render_template_string(body, **ctx)
     return render_template_string(PUBLIC_BASE,title=title,body=inner,academia=ac["nome"],cor=ac["cor"] or "#111827")
 
+@app.route("/primeiro-acesso", methods=["GET","POST"])
+def primeiro_acesso():
+    con = db()
+
+    total = con.cursor().execute(
+        "SELECT COUNT(*) AS n FROM academias"
+    ).fetchone()["n"]
+
+    # Primeiro acesso só existe enquanto não houver academia.
+    if total > 0:
+        con.close()
+        return redirect("/login")
+
+    erro = ""
+
+    if request.method == "POST":
+        academia = request.form.get("academia", "").strip()
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "").strip()
+        confirmar = request.form.get("confirmar", "").strip()
+
+        if not academia or not nome or not email or not senha:
+            erro = "Preencha todos os campos."
+        elif senha != confirmar:
+            erro = "As senhas não conferem."
+        elif len(senha) < 4:
+            erro = "A senha deve possuir pelo menos 4 caracteres."
+        else:
+            try:
+                cur = con.cursor()
+
+                cur.execute(
+                    """INSERT INTO academias(nome,plano,criado_em)
+                       VALUES(%s,%s,%s) RETURNING id""",
+                    (academia, "GRATUITO", agora())
+                )
+
+                academia_id = cur.fetchone()["id"]
+
+                cur.execute(
+                    """INSERT INTO usuarios
+                       (academia_id,nome,email,senha,perfil,ativo,criado_em)
+                       VALUES(%s,%s,%s,%s,%s,1,%s)""",
+                    (academia_id,nome,email,senha,"DONO",agora())
+                )
+
+                for modalidade in (
+                    "Musculação","Jiu-Jítsu","Muay Thai","Boxe",
+                    "Funcional","Cross Training","Pilates","Yoga",
+                    "Dança","Natação","Personal"
+                ):
+                    cur.execute(
+                        "INSERT INTO modalidades(academia_id,nome) VALUES(%s,%s)",
+                        (academia_id, modalidade)
+                    )
+
+                cur.execute(
+                    """INSERT INTO planos
+                       (academia_id,nome,valor,periodicidade,descricao)
+                       VALUES(%s,%s,%s,%s,%s)""",
+                    (
+                        academia_id,
+                        "Plano Gratuito",
+                        0,
+                        "MENSAL",
+                        "Plano sem cobrança"
+                    )
+                )
+
+                con.commit()
+                con.close()
+
+                return redirect("/login")
+
+            except Exception:
+                con.rollback()
+                erro = "Não foi possível concluir o primeiro cadastro."
+
+    con.close()
+
+    return page("Primeiro acesso","""
+    <div class="card"
+         style="max-width:620px;width:92%;margin:5vh auto;padding:32px;border-radius:24px">
+
+      <h1 style="font-size:42px;margin-bottom:10px">
+        Primeiro acesso
+      </h1>
+
+      <p class="muted" style="font-size:24px;margin-bottom:26px">
+        Cadastre a academia e o proprietário do TatameOne.
+      </p>
+
+      {% if erro %}
+      <p style="color:#dc2626;font-size:22px">{{erro}}</p>
+      {% endif %}
+
+      <form method="post">
+
+        <label>Nome da academia</label>
+        <input name="academia" required>
+
+        <label>Nome do proprietário</label>
+        <input name="nome" required>
+
+        <label>E-mail</label>
+        <input name="email" type="email" required>
+
+        <label>Senha</label>
+        <input name="senha" type="password" required>
+
+        <label>Confirmar senha</label>
+        <input name="confirmar" type="password" required>
+
+        <button class="green"
+                style="width:100%;font-size:26px;font-weight:800;
+                       min-height:68px;border-radius:14px">
+          Criar academia
+        </button>
+
+      </form>
+    </div>
+    """, erro=erro)
+
+
 @app.route("/login", methods=["GET","POST"])
 def login():
+    con = db()
+    total = con.cursor().execute(
+        "SELECT COUNT(*) AS n FROM academias"
+    ).fetchone()["n"]
+    con.close()
+
+    if total == 0:
+        return redirect("/primeiro-acesso")
+
     erro=""
     if request.method=="POST":
         con=db()
@@ -445,10 +572,10 @@ def login():
     {% if erro %}<p style="color:#dc2626;font-size:24px">{{erro}}</p>{% endif %}
     <form method="post">
     <label style="font-size:28px">E-mail</label>
-    <input name="email" type="email" required value="admin@tatameone.local"
+    <input name="email" type="email" required
            style="font-size:27px;padding:18px;min-height:66px;margin-bottom:22px">
     <label style="font-size:28px">Senha</label>
-    <input name="senha" type="password" required value="1234"
+    <input name="senha" type="password" required
            style="font-size:27px;padding:18px;min-height:66px;margin-bottom:26px">
     <button class="green" style="width:100%;font-size:28px;font-weight:800;min-height:70px;border-radius:14px">Entrar</button>
     </form></div>""", erro=erro)
