@@ -323,7 +323,47 @@ h2{font-size:32px}
 <a href="/" style="display:inline-flex;align-items:center;gap:12px;background:#111827;color:white;text-decoration:none;padding:20px 28px;border-radius:16px;font-weight:800;font-size:26px;min-height:64px">← Voltar ao Painel</a>
 </div>
 {% endif %}
-<div class="wrap">{{body|safe}}</div></body></html>
+<div class="wrap">{{body|safe}}</div>
+
+{% if session.get('uid') and request.path == '/' %}
+<div id="diag-tatameone"
+style="
+position:fixed;
+bottom:6px;
+left:6px;
+right:6px;
+z-index:99999;
+background:#111827;
+color:white;
+padding:8px;
+border-radius:8px;
+font-size:13px;
+text-align:center;
+opacity:.92;
+">
+MEDINDO TELA...
+</div>
+
+<script>
+(function(){
+    function medir(){
+        var vv = window.visualViewport;
+        var texto =
+            "IW:" + window.innerWidth +
+            " | SW:" + screen.width +
+            " | DPR:" + window.devicePixelRatio +
+            " | VV:" + (vv ? Math.round(vv.width) : "N/A");
+
+        document.getElementById("diag-tatameone").textContent = texto;
+    }
+
+    medir();
+    window.addEventListener("resize", medir);
+})();
+</script>
+{% endif %}
+
+</body></html>
 """
 
 def page(title, body, **ctx):
