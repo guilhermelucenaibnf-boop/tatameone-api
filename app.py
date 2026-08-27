@@ -119,6 +119,13 @@ def init_db():
         for m in ("Musculação","Jiu-Jítsu","Muay Thai","Boxe","Funcional","Cross Training","Pilates","Yoga","Dança","Natação","Personal"):
             cur.execute("INSERT INTO modalidades(academia_id,nome) VALUES(%s,%s)",(academia_inicial,m))
         cur.execute("INSERT INTO planos(academia_id,nome,valor,periodicidade,descricao) VALUES(%s,%s,%s,%s,%s)",(academia_inicial,"Plano Gratuito",0,"MENSAL","Plano sem cobrança"))
+    # Permissões individuais por usuário.
+    # NULL = usar as permissões padrão do perfil.
+    cur.execute("""
+        ALTER TABLE usuarios
+        ADD COLUMN IF NOT EXISTS permissoes_customizadas TEXT
+    """)
+
     con.commit()
     con.close()
 
@@ -130,8 +137,58 @@ def login_required(fn):
         return fn(*a, **kw)
     return wrap
 
+def permissao_required(area):
+    def decorator(fn):
+        @wraps(fn)
+        def wrap(*a, **kw):
+            if not session.get("uid"):
+                return redirect(url_for("login"))
+
+            if not tem_permissao(area):
+                flash("Você não tem permissão para acessar esta área.")
+                return redirect("/")
+
+            return fn(*a, **kw)
+        return wrap
+    return decorator
+
 def aid():
     return session.get("academia_id")
+
+# Perfis de acesso do TatameOne
+PERMISSOES = {
+    "DONO": {
+        "painel", "alunos", "checkin", "planos",
+        "financeiro", "aulas", "avaliacoes", "config"
+    },
+    "ADMIN": {
+        "painel", "alunos", "checkin", "planos",
+        "financeiro", "aulas", "avaliacoes"
+    },
+    "PROFESSOR": {
+        "painel", "alunos", "checkin",
+        "aulas", "avaliacoes"
+    },
+    "FUNCIONARIO": {
+        "painel", "alunos", "checkin"
+    }
+}
+
+def tem_permissao(area):
+    perfil = str(session.get("perfil") or "").upper()
+
+    # DONO sempre mantém acesso completo.
+    if perfil == "DONO":
+        return area in PERMISSOES["DONO"]
+
+    # Permissões personalizadas já carregadas no login.
+    personalizadas = session.get("permissoes_customizadas")
+
+    if personalizadas is not None:
+        return area in set(personalizadas)
+
+    # Sem personalização: usa o padrão do perfil.
+    return area in PERMISSOES.get(perfil, set())
 
 BASE = """
 <!doctype html><html lang="pt-BR"><head>
@@ -250,14 +307,14 @@ h2{font-size:32px}
 <div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block"></div><div>{{session.get('nome','')}}</div></div>
 {% if session.get('uid') and request.path == '/' %}
 <div class="nav-wrap"><div class="nav">
-<a class="btn light" href="/painel"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/alunos"><span class="nav-icon">👥</span><span class="nav-copy"><span class="nav-title">Alunos</span><span class="nav-desc">Cadastros e acompanhamento</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/checkin"><span class="nav-icon">✅</span><span class="nav-copy"><span class="nav-title">Check-in</span><span class="nav-desc">Registrar entrada dos alunos</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/planos"><span class="nav-icon">💳</span><span class="nav-copy"><span class="nav-title">Planos</span><span class="nav-desc">Planos e mensalidades</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/financeiro"><span class="nav-icon">💰</span><span class="nav-copy"><span class="nav-title">Financeiro</span><span class="nav-desc">Pagamentos e recebimentos</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/aulas"><span class="nav-icon">📅</span><span class="nav-copy"><span class="nav-title">Aulas</span><span class="nav-desc">Agenda, horários e professores</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/avaliacoes"><span class="nav-icon">📈</span><span class="nav-copy"><span class="nav-title">Avaliações</span><span class="nav-desc">Avaliações e evolução</span></span><span class="nav-arrow">›</span></a>
-<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>
+{% if tem_permissao('painel') %}<a class="btn light" href="/painel"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('alunos') %}<a class="btn light" href="/alunos"><span class="nav-icon">👥</span><span class="nav-copy"><span class="nav-title">Alunos</span><span class="nav-desc">Cadastros e acompanhamento</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('checkin') %}<a class="btn light" href="/checkin"><span class="nav-icon">✅</span><span class="nav-copy"><span class="nav-title">Check-in</span><span class="nav-desc">Registrar entrada dos alunos</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('planos') %}<a class="btn light" href="/planos"><span class="nav-icon">💳</span><span class="nav-copy"><span class="nav-title">Planos</span><span class="nav-desc">Planos e mensalidades</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('financeiro') %}<a class="btn light" href="/financeiro"><span class="nav-icon">💰</span><span class="nav-copy"><span class="nav-title">Financeiro</span><span class="nav-desc">Pagamentos e recebimentos</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('aulas') %}<a class="btn light" href="/aulas"><span class="nav-icon">📅</span><span class="nav-copy"><span class="nav-title">Aulas</span><span class="nav-desc">Agenda, horários e professores</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('avaliacoes') %}<a class="btn light" href="/avaliacoes"><span class="nav-icon">📈</span><span class="nav-copy"><span class="nav-title">Avaliações</span><span class="nav-desc">Avaliações e evolução</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('config') %}<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>{% endif %}
 <a class="btn danger" href="/logout"><span class="nav-icon">🚪</span><span class="nav-copy"><span class="nav-title">Sair</span><span class="nav-desc">Encerrar sessão</span></span><span class="nav-arrow">›</span></a>
 </div></div>
 {% endif %}
@@ -271,7 +328,12 @@ h2{font-size:32px}
 
 def page(title, body, **ctx):
     inner = render_template_string(body, **ctx)
-    return render_template_string(BASE, title=title, body=inner)
+    return render_template_string(
+        BASE,
+        title=title,
+        body=inner,
+        tem_permissao=tem_permissao
+    )
 
 PUBLIC_BASE = """
 <!doctype html><html lang="pt-BR"><head>
@@ -301,7 +363,23 @@ def login():
                       (request.form["email"].strip(),request.form["senha"])).fetchone()
         con.close()
         if u:
-            session.update(uid=u["id"], academia_id=u["academia_id"], nome=u["nome"], perfil=u["perfil"])
+            permissoes_sessao = None
+
+            if u["permissoes_customizadas"] is not None:
+                permissoes_sessao = [
+                    x.strip()
+                    for x in str(u["permissoes_customizadas"]).split(",")
+                    if x.strip()
+                ]
+
+            session.update(
+                uid=u["id"],
+                academia_id=u["academia_id"],
+                nome=u["nome"],
+                perfil=u["perfil"],
+                permissoes_customizadas=permissoes_sessao
+            )
+
             return redirect("/")
         erro="E-mail ou senha inválidos."
     return page("Entrar","""
@@ -331,6 +409,7 @@ def inicio():
 
 @app.route("/painel")
 @login_required
+@permissao_required("painel")
 def dashboard():
     con=db()
     stats={
@@ -378,6 +457,7 @@ def dashboard():
 
 @app.route("/alunos")
 @login_required
+@permissao_required("alunos")
 def alunos():
     con=db()
     rows=con.cursor().execute("SELECT * FROM alunos WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
@@ -519,6 +599,7 @@ def recusar_pre_cadastro(id):
 
 @app.route("/alunos/novo", methods=["GET","POST"])
 @login_required
+@permissao_required("alunos")
 def aluno_novo():
     con=db()
     mods=con.cursor().execute("SELECT nome FROM modalidades WHERE academia_id=%s AND ativo=1 ORDER BY nome",(aid(),)).fetchall()
@@ -1031,6 +1112,7 @@ def aluno_excluir(id):
 
 @app.route("/checkin", methods=["GET","POST"])
 @login_required
+@permissao_required("checkin")
 def checkin():
     msg=""
     con=db()
@@ -1284,6 +1366,7 @@ def checkin_excluir(id):
 
 @app.route("/planos", methods=["GET","POST"])
 @login_required
+@permissao_required("planos")
 def planos():
     con=db()
     if request.method=="POST":
@@ -1347,6 +1430,7 @@ def plano_excluir(id):
 
 @app.route("/financeiro", methods=["GET","POST"])
 @login_required
+@permissao_required("financeiro")
 def financeiro():
     con=db()
 
@@ -1609,57 +1693,964 @@ def financeiro_excluir(id):
     return redirect("/financeiro")
 
 
+
+# ============================================================
+# PROFESSORES
+# ============================================================
+
+@app.route("/professores", methods=["GET","POST"])
+@login_required
+@permissao_required("aulas")
+def professores():
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    if request.method == "POST":
+        nome = request.form.get("nome","").strip()
+        telefone = request.form.get("telefone","").strip()
+        email = request.form.get("email","").strip().lower()
+        especialidades = [
+            x.strip()
+            for x in request.form.getlist("especialidades")
+            if x.strip()
+        ]
+        especialidade = ",".join(especialidades)
+
+        if not nome:
+            erro = "Informe o nome do professor."
+        else:
+            existente = con.cursor().execute(
+                """SELECT id
+                   FROM professores
+                   WHERE academia_id=%s
+                   AND lower(trim(nome))=lower(trim(%s))
+                   AND ativo=1
+                   LIMIT 1""",
+                (aid(),nome)
+            ).fetchone()
+
+            if existente:
+                erro = "Já existe um professor ativo com este nome."
+            else:
+                con.cursor().execute(
+                    """INSERT INTO professores
+                       (academia_id,nome,telefone,email,especialidade,ativo)
+                       VALUES(%s,%s,%s,%s,%s,1)""",
+                    (aid(),nome,telefone,email,especialidade)
+                )
+                con.commit()
+                sucesso = "Professor cadastrado com sucesso."
+
+    rows = con.cursor().execute(
+        """SELECT id,nome,telefone,email,especialidade,ativo
+           FROM professores
+           WHERE academia_id=%s
+           ORDER BY ativo DESC,nome""",
+        (aid(),)
+    ).fetchall()
+
+    modalidades = con.cursor().execute(
+        """SELECT id,nome
+           FROM modalidades
+           WHERE academia_id=%s AND ativo=1
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    return page("Professores","""
+    <h1>👨‍🏫 Professores</h1>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card"
+         style="color:#16a34a;margin-bottom:18px">
+      {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="grid">
+
+      <div class="card">
+
+        <h2>➕ Novo professor</h2>
+
+        <form method="post">
+
+          <label>Nome</label>
+          <input name="nome" required>
+
+          <label>Telefone</label>
+          <input name="telefone">
+
+          <label>E-mail</label>
+          <input name="email" type="email">
+
+          <label>Especialidades</label>
+
+          <div class="card"
+               style="box-shadow:none;border:1px solid #ddd;margin-bottom:18px">
+
+            {% for m in modalidades %}
+
+            <label style="display:block;margin-bottom:14px">
+              <input type="checkbox"
+                     name="especialidades"
+                     value="{{m.nome}}"
+                     style="width:auto;margin-right:10px">
+              🥋 {{m.nome}}
+            </label>
+
+            {% else %}
+
+            <p class="muted">
+              Nenhuma modalidade cadastrada.
+              Cadastre modalidades nas Configurações.
+            </p>
+
+            {% endfor %}
+
+          </div>
+
+          <button class="green"
+                  style="width:100%">
+            Cadastrar professor
+          </button>
+
+        </form>
+
+      </div>
+
+      <div class="card">
+
+        <h2>👥 Professores cadastrados</h2>
+
+        {% for p in rows %}
+
+        <div style="padding:18px 0;
+                    border-bottom:1px solid #ddd">
+
+          <b style="font-size:24px">
+            {{p.nome}}
+          </b>
+
+          {% if p.especialidade %}
+          <p>🥋 {{p.especialidade}}</p>
+          {% endif %}
+
+          {% if p.telefone %}
+          <p>📱 {{p.telefone}}</p>
+          {% endif %}
+
+          {% if p.email %}
+          <p>✉️ {{p.email}}</p>
+          {% endif %}
+
+          {% if p.ativo %}
+            <span class="pill">ATIVO</span>
+          {% else %}
+            <span class="pill">INATIVO</span>
+          {% endif %}
+
+          <div class="actions"
+               style="margin-top:18px">
+
+            <a class="btn"
+               href="/professores/{{p.id}}/editar">
+              ✏️ Editar
+            </a>
+
+            <form method="post"
+                  action="/professores/{{p.id}}/status"
+                  style="margin:0">
+
+              {% if p.ativo %}
+
+              <button type="submit"
+                      class="danger">
+                ⛔ Desativar
+              </button>
+
+              {% else %}
+
+              <button type="submit"
+                      class="green">
+                ✅ Ativar
+              </button>
+
+              {% endif %}
+
+            </form>
+
+          </div>
+
+        </div>
+
+        {% else %}
+
+        <p class="muted">
+          Nenhum professor cadastrado.
+        </p>
+
+        {% endfor %}
+
+      </div>
+
+    </div>
+    """,
+    rows=rows,
+    modalidades=modalidades,
+    erro=erro,
+    sucesso=sucesso)
+
+
+@app.route("/professores/<int:id>/editar",
+           methods=["GET","POST"])
+@login_required
+@permissao_required("aulas")
+def professor_editar(id):
+
+    con = db()
+
+    prof = con.cursor().execute(
+        """SELECT id,nome,telefone,email,
+                  especialidade,ativo
+           FROM professores
+           WHERE id=%s AND academia_id=%s""",
+        (id,aid())
+    ).fetchone()
+
+    if not prof:
+        con.close()
+        return redirect("/professores")
+
+    erro = ""
+
+    if request.method == "POST":
+
+        nome = request.form.get("nome","").strip()
+        telefone = request.form.get("telefone","").strip()
+        email = request.form.get("email","").strip().lower()
+        especialidades = [
+            x.strip()
+            for x in request.form.getlist("especialidades")
+            if x.strip()
+        ]
+        especialidade = ",".join(especialidades)
+
+        if not nome:
+            erro = "Informe o nome do professor."
+
+        else:
+
+            con.cursor().execute(
+                """UPDATE professores
+                   SET nome=%s,
+                       telefone=%s,
+                       email=%s,
+                       especialidade=%s
+                   WHERE id=%s
+                   AND academia_id=%s""",
+                (
+                    nome,
+                    telefone,
+                    email,
+                    especialidade,
+                    id,
+                    aid()
+                )
+            )
+
+            con.commit()
+            con.close()
+
+            return redirect("/professores")
+
+    modalidades = con.cursor().execute(
+        """SELECT id,nome
+           FROM modalidades
+           WHERE academia_id=%s AND ativo=1
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    return page("Editar professor","""
+
+    <h1>✏️ Editar professor</h1>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    <div class="card">
+
+      <form method="post">
+
+        <label>Nome</label>
+        <input name="nome"
+               value="{{p.nome}}"
+               required>
+
+        <label>Telefone</label>
+        <input name="telefone"
+               value="{{p.telefone or ''}}">
+
+        <label>E-mail</label>
+        <input name="email"
+               type="email"
+               value="{{p.email or ''}}">
+
+        <label>Especialidades</label>
+
+        {% set atuais = (p.especialidade or '').split(',') %}
+
+        <div class="card"
+             style="box-shadow:none;border:1px solid #ddd;margin-bottom:18px">
+
+          {% for m in modalidades %}
+
+          <label style="display:block;margin-bottom:14px">
+            <input type="checkbox"
+                   name="especialidades"
+                   value="{{m.nome}}"
+                   style="width:auto;margin-right:10px"
+                   {% if m.nome in atuais %}checked{% endif %}>
+            🥋 {{m.nome}}
+          </label>
+
+          {% else %}
+
+          <p class="muted">
+            Nenhuma modalidade cadastrada.
+          </p>
+
+          {% endfor %}
+
+        </div>
+
+        <button class="green"
+                style="width:100%">
+          Salvar alterações
+        </button>
+
+      </form>
+
+    </div>
+
+    """,
+    p=prof,
+    modalidades=modalidades,
+    erro=erro)
+
+
+@app.route("/professores/<int:id>/status",
+           methods=["POST"])
+@login_required
+@permissao_required("aulas")
+def professor_status(id):
+
+    con = db()
+
+    prof = con.cursor().execute(
+        """SELECT id,ativo
+           FROM professores
+           WHERE id=%s AND academia_id=%s""",
+        (id,aid())
+    ).fetchone()
+
+    if prof:
+
+        novo_status = 0 if prof["ativo"] else 1
+
+        con.cursor().execute(
+            """UPDATE professores
+               SET ativo=%s
+               WHERE id=%s
+               AND academia_id=%s""",
+            (novo_status,id,aid())
+        )
+
+        con.commit()
+
+    con.close()
+
+    return redirect("/professores")
+
+
 @app.route("/aulas", methods=["GET","POST"])
 @login_required
+@permissao_required("aulas")
 def aulas():
     con=db()
+    erro = ""
+
     if request.method=="POST":
         f=request.form
-        con.cursor().execute("INSERT INTO aulas(academia_id,modalidade,professor,dia,horario,capacidade) VALUES(%s,%s,%s,%s,%s,%s)",
-                    (aid(),f["modalidade"],f.get("professor"),f.get("dia"),f.get("horario"),int(f.get("capacidade") or 20)))
-        con.commit()
-    rows=con.cursor().execute("SELECT * FROM aulas WHERE academia_id=%s AND ativo=1 ORDER BY dia,horario",(aid(),)).fetchall()
+
+        modalidade = f.get("modalidade","").strip()
+        professor = f.get("professor","").strip()
+
+        professor_valido = True
+
+        if professor:
+            prof = con.cursor().execute(
+                """SELECT especialidade
+                   FROM professores
+                   WHERE academia_id=%s
+                   AND nome=%s
+                   AND ativo=1""",
+                (aid(),professor)
+            ).fetchone()
+
+            if not prof:
+                professor_valido = False
+            else:
+                especialidades = [
+                    x.strip()
+                    for x in str(prof["especialidade"] or "").split(",")
+                    if x.strip()
+                ]
+
+                if modalidade not in especialidades:
+                    professor_valido = False
+
+        if not professor_valido:
+            erro = "Este professor não possui a especialidade da modalidade selecionada."
+        else:
+            con.cursor().execute(
+                """INSERT INTO aulas
+                   (academia_id,modalidade,professor,dia,horario,capacidade)
+                   VALUES(%s,%s,%s,%s,%s,%s)""",
+                (
+                    aid(),
+                    modalidade,
+                    professor,
+                    f.get("dia"),
+                    f.get("horario"),
+                    int(f.get("capacidade") or 20)
+                )
+            )
+            con.commit()
+    rows=con.cursor().execute(
+        """SELECT a.*,
+                  (
+                    SELECT COUNT(*)
+                    FROM alunos al
+                    WHERE al.academia_id=a.academia_id
+                      AND al.ativo=1
+                      AND lower(trim(COALESCE(al.modalidade,''))) =
+                          lower(trim(COALESCE(a.modalidade,'')))
+                  ) AS alunos_modalidade,
+                  GREATEST(
+                    a.capacidade - (
+                      SELECT COUNT(*)
+                      FROM alunos al
+                      WHERE al.academia_id=a.academia_id
+                        AND al.ativo=1
+                        AND lower(trim(COALESCE(al.modalidade,''))) =
+                            lower(trim(COALESCE(a.modalidade,'')))
+                    ),
+                    0
+                  ) AS vagas_disponiveis
+           FROM aulas a
+           WHERE a.academia_id=%s
+           ORDER BY a.ativo DESC,a.dia,a.horario""",
+        (aid(),)
+    ).fetchall()
     mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
+    professores=con.cursor().execute(
+        """SELECT id,nome,especialidade
+           FROM professores
+           WHERE academia_id=%s AND ativo=1
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
     con.close()
     return page("Aulas","""
-    <h1>Agenda de aulas</h1><div class="grid"><div class="card"><form method="post"><label>Modalidade</label><select name="modalidade" required><option value="">Selecione</option>{% for m in mods %}<option>{{m.nome}}</option>{% endfor %}</select>
-    <label>Professor</label><input name="professor"><label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
+    <h1>Agenda de aulas</h1>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    <div class="grid"><div class="card"><form method="post"><label>Modalidade</label>
+    <select name="modalidade"
+            id="modalidade_aula"
+            required
+            onchange="filtrarProfessores()">
+      <option value="">Selecione</option>
+      {% for m in mods %}
+      <option value="{{m.nome}}">{{m.nome}}</option>
+      {% endfor %}
+    </select>
+
+    <label>Professor</label>
+
+    <select name="professor"
+            id="professor_aula"
+            disabled>
+
+      <option value="">
+        Primeiro selecione a modalidade
+      </option>
+
+      {% for p in professores %}
+      <option value="{{p.nome}}"
+              data-especialidades="{{p.especialidade or ''}}"
+              hidden>
+        {{p.nome}}
+      </option>
+      {% endfor %}
+
+    </select>
+
+    <p id="aviso_professor"
+       class="muted"
+       style="margin-top:-10px;margin-bottom:20px">
+      Selecione uma modalidade para visualizar os professores habilitados.
+    </p>
+
+    <a class="btn light"
+       href="/professores"
+       style="display:flex;align-items:center;justify-content:center;width:100%;margin-bottom:22px">
+       👨‍🏫 Gerenciar professores
+    </a>
+
+    <label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
     <label>Horário</label><input type="time" name="horario"><label>Capacidade</label><input type="number" name="capacidade" value="20">
     <button class="green">Cadastrar aula</button></form></div><div class="card">
     {% for x in rows %}
       <div style="padding:14px 0;border-bottom:1px solid #ddd">
         <p style="margin:0 0 10px 0">
           <b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>
-          {{x.professor or 'Professor não definido'}} · {{x.capacidade}} vagas
+          {{x.professor or 'Professor não definido'}}<br>
+          👥 {{x.alunos_modalidade}} aluno{% if x.alunos_modalidade != 1 %}s{% endif %} ·
+          {{x.vagas_disponiveis}} de {{x.capacidade}} vagas disponíveis
         </p>
 
-        <form method="post"
-              action="/aulas/{{x.id}}/excluir"
-              onsubmit="return confirm('Excluir esta aula?');">
-          <button type="submit"
-                  class="danger"
-                  style="margin-top:5px">
-            🗑️ Excluir
-          </button>
-        </form>
+        <div style="margin-top:14px">
+          {% if x.ativo %}
+            <span class="pill">ATIVA</span>
+          {% else %}
+            <span class="pill">INATIVA</span>
+          {% endif %}
+        </div>
+
+        <div class="actions" style="margin-top:18px">
+
+          <a class="btn"
+             href="/aulas/{{x.id}}/editar">
+            ✏️ Editar
+          </a>
+
+          <form method="post"
+                action="/aulas/{{x.id}}/status"
+                style="margin:0">
+
+            {% if x.ativo %}
+            <button type="submit"
+                    class="danger">
+              ⏸️ Desativar
+            </button>
+            {% else %}
+            <button type="submit"
+                    class="green">
+              ▶️ Ativar
+            </button>
+            {% endif %}
+
+          </form>
+
+        </div>
       </div>
     {% else %}
       <p class="muted">Nenhuma aula cadastrada.</p>
     {% endfor %}
-    </div></div>""",rows=rows,mods=mods)
+    </div></div>
+
+    <script>
+    function filtrarProfessores() {
+        const modalidade = document.getElementById("modalidade_aula").value;
+        const select = document.getElementById("professor_aula");
+        const aviso = document.getElementById("aviso_professor");
+
+        select.value = "";
+
+        let encontrados = 0;
+
+        Array.from(select.options).forEach((option, index) => {
+
+            if (index === 0) {
+                return;
+            }
+
+            const especialidades = (option.dataset.especialidades || "")
+                .split(",")
+                .map(x => x.trim())
+                .filter(Boolean);
+
+            const mostrar =
+                modalidade !== "" &&
+                especialidades.includes(modalidade);
+
+            option.hidden = !mostrar;
+            option.disabled = !mostrar;
+
+            if (mostrar) {
+                encontrados++;
+            }
+        });
+
+        if (!modalidade) {
+            select.disabled = true;
+            select.options[0].text =
+                "Primeiro selecione a modalidade";
+
+            aviso.textContent =
+                "Selecione uma modalidade para visualizar os professores habilitados.";
+
+        } else if (encontrados === 0) {
+            select.disabled = true;
+            select.options[0].text =
+                "Nenhum professor habilitado";
+
+            aviso.textContent =
+                "Nenhum professor ativo possui esta especialidade.";
+
+        } else {
+            select.disabled = false;
+            select.options[0].text =
+                "Professor não definido";
+
+            aviso.textContent =
+                encontrados === 1
+                ? "1 professor habilitado para esta modalidade."
+                : encontrados + " professores habilitados para esta modalidade.";
+        }
+    }
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        filtrarProfessores
+    );
+    </script>
+    """,
+    rows=rows,
+    mods=mods,
+    professores=professores,
+    erro=erro)
 
 
-@app.route("/aulas/<int:id>/excluir", methods=["POST"])
+@app.route("/aulas/<int:id>/editar", methods=["GET","POST"])
 @login_required
-def aula_excluir(id):
-    con=db()
+@permissao_required("aulas")
+def aula_editar(id):
+    con = db()
 
-    con.cursor().execute(
-        "DELETE FROM aulas WHERE id=%s AND academia_id=%s",
+    aula = con.cursor().execute(
+        """SELECT *
+           FROM aulas
+           WHERE id=%s AND academia_id=%s""",
         (id,aid())
-    )
+    ).fetchone()
 
-    con.commit()
+    if not aula:
+        con.close()
+        return redirect("/aulas")
+
+    mods = con.cursor().execute(
+        """SELECT id,nome
+           FROM modalidades
+           WHERE academia_id=%s AND ativo=1
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    professores = con.cursor().execute(
+        """SELECT id,nome,especialidade
+           FROM professores
+           WHERE academia_id=%s AND ativo=1
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    erro = ""
+
+    if request.method == "POST":
+        f = request.form
+
+        modalidade = f.get("modalidade","").strip()
+        professor = f.get("professor","").strip()
+        dia = f.get("dia","").strip()
+        horario = f.get("horario","").strip()
+
+        try:
+            capacidade = int(f.get("capacidade") or 20)
+        except (ValueError, TypeError):
+            capacidade = 20
+
+        professor_valido = True
+
+        if professor:
+            prof = con.cursor().execute(
+                """SELECT especialidade
+                   FROM professores
+                   WHERE academia_id=%s
+                   AND nome=%s
+                   AND ativo=1""",
+                (aid(),professor)
+            ).fetchone()
+
+            if not prof:
+                professor_valido = False
+            else:
+                especialidades = [
+                    x.strip()
+                    for x in str(prof["especialidade"] or "").split(",")
+                    if x.strip()
+                ]
+
+                if modalidade not in especialidades:
+                    professor_valido = False
+
+        if not modalidade:
+            erro = "Selecione a modalidade."
+
+        elif not professor_valido:
+            erro = "Este professor não possui a especialidade da modalidade selecionada."
+
+        elif capacidade < 1:
+            erro = "A capacidade deve ser de pelo menos 1 aluno."
+
+        else:
+            con.cursor().execute(
+                """UPDATE aulas
+                   SET modalidade=%s,
+                       professor=%s,
+                       dia=%s,
+                       horario=%s,
+                       capacidade=%s
+                   WHERE id=%s
+                   AND academia_id=%s""",
+                (
+                    modalidade,
+                    professor,
+                    dia,
+                    horario,
+                    capacidade,
+                    id,
+                    aid()
+                )
+            )
+
+            con.commit()
+            con.close()
+
+            return redirect("/aulas")
+
+    con.close()
+
+    return page("Editar aula","""
+    <h1>✏️ Editar aula</h1>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    <div class="card">
+
+      <form method="post">
+
+        <label>Modalidade</label>
+
+        <select name="modalidade"
+                id="modalidade_editar"
+                required
+                onchange="filtrarProfessoresEditar()">
+
+          <option value="">Selecione</option>
+
+          {% for m in mods %}
+          <option value="{{m.nome}}"
+                  {% if m.nome == aula.modalidade %}selected{% endif %}>
+            {{m.nome}}
+          </option>
+          {% endfor %}
+
+        </select>
+
+        <label>Professor</label>
+
+        <select name="professor"
+                id="professor_editar">
+
+          <option value="">
+            Professor não definido
+          </option>
+
+          {% for p in professores %}
+          <option value="{{p.nome}}"
+                  data-especialidades="{{p.especialidade or ''}}"
+                  {% if p.nome == aula.professor %}selected{% endif %}>
+            {{p.nome}}
+          </option>
+          {% endfor %}
+
+        </select>
+
+        <p id="aviso_professor_editar"
+           class="muted"
+           style="margin-top:-10px;margin-bottom:20px">
+        </p>
+
+        <label>Dia</label>
+
+        <select name="dia">
+          {% for d in ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"] %}
+          <option value="{{d}}"
+                  {% if d == aula.dia %}selected{% endif %}>
+            {{d}}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label>Horário</label>
+        <input type="time"
+               name="horario"
+               value="{{aula.horario or ''}}">
+
+        <label>Capacidade</label>
+        <input type="number"
+               name="capacidade"
+               min="1"
+               value="{{aula.capacidade or 20}}">
+
+        <button class="green"
+                style="width:100%">
+          💾 Salvar alterações
+        </button>
+
+      </form>
+
+    </div>
+
+    <script>
+    function filtrarProfessoresEditar() {
+        const modalidade =
+            document.getElementById("modalidade_editar").value;
+
+        const select =
+            document.getElementById("professor_editar");
+
+        const aviso =
+            document.getElementById("aviso_professor_editar");
+
+        let encontrados = 0;
+
+        Array.from(select.options).forEach((option, index) => {
+
+            if (index === 0) {
+                return;
+            }
+
+            const especialidades =
+                (option.dataset.especialidades || "")
+                .split(",")
+                .map(x => x.trim())
+                .filter(Boolean);
+
+            const mostrar =
+                modalidade !== "" &&
+                especialidades.includes(modalidade);
+
+            option.hidden = !mostrar;
+            option.disabled = !mostrar;
+
+            if (mostrar) {
+                encontrados++;
+            }
+        });
+
+        if (!modalidade) {
+            select.disabled = true;
+
+            aviso.textContent =
+                "Selecione uma modalidade para visualizar os professores habilitados.";
+
+        } else if (encontrados === 0) {
+            select.disabled = true;
+            select.value = "";
+
+            aviso.textContent =
+                "Nenhum professor ativo possui esta especialidade.";
+
+        } else {
+            select.disabled = false;
+
+            aviso.textContent =
+                encontrados === 1
+                ? "1 professor habilitado para esta modalidade."
+                : encontrados + " professores habilitados para esta modalidade.";
+        }
+    }
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        filtrarProfessoresEditar
+    );
+    </script>
+    """,
+    aula=aula,
+    mods=mods,
+    professores=professores,
+    erro=erro)
+
+
+@app.route("/aulas/<int:id>/status", methods=["POST"])
+@login_required
+@permissao_required("aulas")
+def aula_status(id):
+    con = db()
+
+    aula = con.cursor().execute(
+        """SELECT id,ativo
+           FROM aulas
+           WHERE id=%s AND academia_id=%s""",
+        (id,aid())
+    ).fetchone()
+
+    if aula:
+        novo_status = 0 if aula["ativo"] else 1
+
+        con.cursor().execute(
+            """UPDATE aulas
+               SET ativo=%s
+               WHERE id=%s
+               AND academia_id=%s""",
+            (novo_status,id,aid())
+        )
+
+        con.commit()
+
     con.close()
 
     return redirect("/aulas")
@@ -1667,6 +2658,7 @@ def aula_excluir(id):
 
 @app.route("/avaliacoes", methods=["GET","POST"])
 @login_required
+@permissao_required("avaliacoes")
 def avaliacoes():
     con=db()
 
@@ -1975,6 +2967,7 @@ def avaliacoes():
               <b>{{x.nome}}</b> · {{x.data}}
             </p>
 
+            <h3>👤 Dados básicos</h3>
             <p>
               Peso: <b>{{x.peso or '-'}}</b><br>
               Altura: <b>{{x.altura or '-'}}</b><br>
@@ -1984,26 +2977,77 @@ def avaliacoes():
                 <b>{{'%.2f'|format(x.peso / (x.altura * x.altura))}}</b><br>
               {% endif %}
 
-              Gordura: <b>{{x.gordura or '-'}}</b>%<br>
-              Cintura: <b>{{x.cintura or '-'}}</b><br>
-              Abdômen: <b>{{x.abdomen or '-'}}</b><br>
-              Quadril: <b>{{x.quadril or '-'}}</b>
+              Gordura corporal: <b>{{x.gordura or '-'}}</b>%<br>
+              Unidade: <b>{{x.unidade or 'METRICO'}}</b>
             </p>
 
-            {% if x.pressao_sistolica or x.pressao_diastolica %}
-              <p>
-                ❤️ PA:
-                {{x.pressao_sistolica or '-'}} /
-                {{x.pressao_diastolica or '-'}}
-              </p>
-            {% endif %}
+            <h3>📏 Perimetria</h3>
+            <p>
+              Pescoço: <b>{{x.pescoco or '-'}}</b><br>
+              Ombros: <b>{{x.ombros or '-'}}</b><br>
+              Peito / Tórax: <b>{{x.peito or '-'}}</b><br>
+              Cintura: <b>{{x.cintura or '-'}}</b><br>
+              Abdômen: <b>{{x.abdomen or '-'}}</b><br>
+              Quadril: <b>{{x.quadril or '-'}}</b><br>
+              Braço direito: <b>{{x.braco_direito or '-'}}</b><br>
+              Braço esquerdo: <b>{{x.braco_esquerdo or '-'}}</b><br>
+              Antebraço direito: <b>{{x.antebraco_direito or '-'}}</b><br>
+              Antebraço esquerdo: <b>{{x.antebraco_esquerdo or '-'}}</b><br>
+              Coxa direita: <b>{{x.coxa_direita or '-'}}</b><br>
+              Coxa esquerda: <b>{{x.coxa_esquerda or '-'}}</b><br>
+              Panturrilha direita: <b>{{x.panturrilha_direita or '-'}}</b><br>
+              Panturrilha esquerda
+<b>{{x.panturrilha_esquerda or '-'}}</b>
+            </p>
+
+            <h3>🧬 Composição corporal</h3>
+            <p>
+              Massa muscular: <b>{{x.massa_muscular or '-'}}</b><br>
+              Massa óssea: <b>{{x.massa_ossea or '-'}}</b><br>
+              Água corporal: <b>{{x.agua_corporal or '-'}}</b>%<br>
+              Gordura visceral: <b>{{x.gordura_visceral or '-'}}</b><br>
+              Metabolismo basal: <b>{{x.metabolismo_basal or '-'}}</b> kcal
+            </p>
+
+            <h3>📐 Dobras cutâneas</h3>
+            <p>
+              Peitoral: <b>{{x.dobra_peitoral or '-'}}</b> mm<br>
+              Abdominal: <b>{{x.dobra_abdominal or '-'}}</b> mm<br>
+              Coxa: <b>{{x.dobra_coxa or '-'}}</b> mm<br>
+              Tríceps: <b>{{x.dobra_triceps or '-'}}</b> mm<br>
+              Subescapular: <b>{{x.dobra_subescapular or '-'}}</b> mm<br>
+              Supra-ilíaca: <b>{{x.dobra_suprailiaca or '-'}}</b> mm<br>
+              Axilar: <b>{{x.dobra_axilar or '-'}}</b> mm
+            </p>
+
+            <h3>🏃 Performance</h3>
+            <p>
+              Flexibilidade: <b>{{x.flexibilidade or '-'}}</b><br>
+              Força: <b>{{x.forca or '-'}}</b><br>
+              Resistência: <b>{{x.resistencia or '-'}}</b><br>
+              Agilidade: <b>{{x.agilidade or '-'}}</b>
+            </p>
+
+            <h3>❤️ Sinais básicos</h3>
+            <p>
+              Pressão arterial:
+              <b>{{x.pressao_sistolica or '-'}} / {{x.pressao_diastolica or '-'}}</b><br>
+              Frequência cardíaca: <b>{{x.frequencia_cardiaca or '-'}}</b><br>
+              FC de repouso: <b>{{x.frequencia_repouso or '-'}}</b>
+            </p>
+
+            <h3>🎯 Objetivo e protocolo</h3>
 
             {% if x.objetivo %}
-              <p>🎯 {{x.objetivo}}</p>
+              <p>🎯 Objetivo: <b>{{x.objetivo}}</b></p>
+            {% else %}
+              <p>🎯 Objetivo: <b>-</b></p>
             {% endif %}
 
             {% if x.protocolo %}
-              <p class="muted">📋 {{x.protocolo}}</p>
+              <p>📋 Protocolo: <b>{{x.protocolo}}</b></p>
+            {% else %}
+              <p>📋 Protocolo: <b>-</b></p>
             {% endif %}
 
             {% if x.observacoes %}
@@ -2048,8 +3092,387 @@ def avaliacao_excluir(id):
     return redirect("/avaliacoes")
 
 
+@app.route("/usuarios", methods=["GET","POST"])
+@login_required
+def usuarios():
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Apenas o dono da academia pode gerenciar usuários.")
+        return redirect("/")
+
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    if request.method == "POST":
+        nome = request.form.get("nome","").strip()
+        email = request.form.get("email","").strip().lower()
+        senha = request.form.get("senha","").strip()
+        perfil = request.form.get("perfil","FUNCIONARIO").strip().upper()
+
+        if perfil not in ("ADMIN","PROFESSOR","FUNCIONARIO"):
+            erro = "Perfil inválido."
+        elif not nome or not email or not senha:
+            erro = "Preencha nome, e-mail e senha."
+        else:
+            existente = con.cursor().execute(
+                "SELECT id FROM usuarios WHERE lower(email)=lower(%s)",
+                (email,)
+            ).fetchone()
+
+            if existente:
+                erro = "Este e-mail já está cadastrado."
+            else:
+                con.cursor().execute(
+                    """INSERT INTO usuarios
+                    (academia_id,nome,email,senha,perfil,ativo,criado_em)
+                    VALUES(%s,%s,%s,%s,%s,1,%s)""",
+                    (aid(),nome,email,senha,perfil,agora())
+                )
+                con.commit()
+                sucesso = "Usuário cadastrado com sucesso."
+
+    rows = con.cursor().execute(
+        """SELECT id,nome,email,perfil,ativo
+           FROM usuarios
+           WHERE academia_id=%s
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    return page("Usuários","""
+    <h1>👥 Usuários e funcionários</h1>
+
+    {% if erro %}
+    <div class="card" style="color:#dc2626;margin-bottom:18px">
+        {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card" style="color:#16a34a;margin-bottom:18px">
+        {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="grid">
+
+      <div class="card">
+        <h2>➕ Novo usuário</h2>
+
+        <form method="post">
+          <label>Nome</label>
+          <input name="nome" required>
+
+          <label>E-mail</label>
+          <input name="email" type="email" required>
+
+          <label>Senha</label>
+          <input name="senha" type="password" required>
+
+          <label>Perfil</label>
+          <select name="perfil" required>
+            <option value="FUNCIONARIO">Funcionário</option>
+            <option value="PROFESSOR">Professor</option>
+            <option value="ADMIN">Administrador</option>
+          </select>
+
+          <button class="green" style="width:100%">
+            Criar usuário
+          </button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>👤 Usuários cadastrados</h2>
+
+        {% for u in rows %}
+        <div style="padding:16px 0;border-bottom:1px solid #ddd">
+          <b>{{u.nome}}</b>
+          <p>{{u.email}}</p>
+          <span class="pill">{{u.perfil}}</span>
+          {% if u.ativo %}
+            <span class="pill">ATIVO</span>
+          {% else %}
+            <span class="pill">INATIVO</span>
+          {% endif %}
+
+          {% if u.perfil != 'DONO' %}
+          <div class="actions" style="margin-top:18px">
+
+            <a class="btn" href="/usuarios/{{u.id}}/editar">
+              ✏️ Editar
+            </a>
+
+            <form method="post"
+                  action="/usuarios/{{u.id}}/status"
+                  style="margin:0">
+
+              {% if u.ativo %}
+              <button type="submit" class="danger">
+                ⛔ Desativar
+              </button>
+              {% else %}
+              <button type="submit" class="green">
+                ✅ Ativar
+              </button>
+              {% endif %}
+
+            </form>
+
+          </div>
+          {% endif %}
+
+        </div>
+        {% else %}
+        <p class="muted">Nenhum usuário cadastrado.</p>
+        {% endfor %}
+      </div>
+
+    </div>
+    """, rows=rows, erro=erro, sucesso=sucesso)
+
+
+@app.route("/usuarios/<int:id>/editar", methods=["GET","POST"])
+@login_required
+def usuario_editar(id):
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Apenas o dono da academia pode gerenciar usuários.")
+        return redirect("/")
+
+    con = db()
+
+    u = con.cursor().execute(
+        """SELECT id,nome,email,perfil,ativo,permissoes_customizadas
+           FROM usuarios
+           WHERE id=%s AND academia_id=%s""",
+        (id, aid())
+    ).fetchone()
+
+    if not u:
+        con.close()
+        return redirect("/usuarios")
+
+    if str(u["perfil"]).upper() == "DONO":
+        con.close()
+        flash("O usuário DONO é protegido.")
+        return redirect("/usuarios")
+
+    erro = ""
+
+    if request.method == "POST":
+        nome = request.form.get("nome","").strip()
+        email = request.form.get("email","").strip().lower()
+        perfil = request.form.get("perfil","FUNCIONARIO").strip().upper()
+        nova_senha = request.form.get("nova_senha","").strip()
+
+        areas_validas = {
+            "painel", "alunos", "checkin", "planos",
+            "financeiro", "aulas", "avaliacoes"
+        }
+
+        permissoes_escolhidas = [
+            area for area in request.form.getlist("permissoes")
+            if area in areas_validas
+        ]
+
+        permissoes_customizadas = ",".join(permissoes_escolhidas)
+
+        if perfil not in ("ADMIN","PROFESSOR","FUNCIONARIO"):
+            erro = "Perfil inválido."
+
+        elif not nome or not email:
+            erro = "Nome e e-mail são obrigatórios."
+
+        else:
+            existente = con.cursor().execute(
+                """SELECT id FROM usuarios
+                   WHERE lower(email)=lower(%s)
+                   AND id<>%s""",
+                (email,id)
+            ).fetchone()
+
+            if existente:
+                erro = "Este e-mail já está sendo usado."
+
+            else:
+                if nova_senha:
+                    con.cursor().execute(
+                        """UPDATE usuarios
+                           SET nome=%s,email=%s,perfil=%s,senha=%s,
+                               permissoes_customizadas=%s
+                           WHERE id=%s AND academia_id=%s""",
+                        (nome,email,perfil,nova_senha,
+                         permissoes_customizadas,id,aid())
+                    )
+                else:
+                    con.cursor().execute(
+                        """UPDATE usuarios
+                           SET nome=%s,email=%s,perfil=%s,
+                               permissoes_customizadas=%s
+                           WHERE id=%s AND academia_id=%s""",
+                        (nome,email,perfil,
+                         permissoes_customizadas,id,aid())
+                    )
+
+                con.commit()
+                con.close()
+                return redirect("/usuarios")
+
+    con.close()
+
+    return page("Editar usuário","""
+    <h1>✏️ Editar usuário</h1>
+
+    {% if erro %}
+    <div class="card" style="color:#dc2626;margin-bottom:18px">
+        {{erro}}
+    </div>
+    {% endif %}
+
+    <div class="card">
+
+      <form method="post">
+
+        <label>Nome</label>
+        <input name="nome" value="{{u.nome}}" required>
+
+        <label>E-mail</label>
+        <input name="email" type="email" value="{{u.email}}" required>
+
+        <label>Perfil</label>
+        <select name="perfil">
+          <option value="FUNCIONARIO" {% if u.perfil == 'FUNCIONARIO' %}selected{% endif %}>
+            Funcionário
+          </option>
+          <option value="PROFESSOR" {% if u.perfil == 'PROFESSOR' %}selected{% endif %}>
+            Professor
+          </option>
+          <option value="ADMIN" {% if u.perfil == 'ADMIN' %}selected{% endif %}>
+            Administrador
+          </option>
+        </select>
+
+        <label>Nova senha</label>
+        <input name="nova_senha" type="password"
+               placeholder="Deixe vazio para manter a senha atual">
+
+        <hr style="margin:28px 0">
+
+        <h2>🔐 Permissões de acesso</h2>
+        <p class="muted">
+          Escolha exatamente quais áreas este usuário poderá acessar.
+        </p>
+
+        {% set atuais = (u.permissoes_customizadas or '').split(',') %}
+
+        <div class="card" style="box-shadow:none;border:1px solid #ddd">
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="painel"
+                   style="width:auto;margin-right:12px"
+                   {% if 'painel' in atuais %}checked{% endif %}>
+            📊 Painel
+          </label>
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="alunos"
+                   style="width:auto;margin-right:12px"
+                   {% if 'alunos' in atuais %}checked{% endif %}>
+            👥 Alunos
+          </label>
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="checkin"
+                   style="width:auto;margin-right:12px"
+                   {% if 'checkin' in atuais %}checked{% endif %}>
+            ✅ Check-in
+          </label>
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="planos"
+                   style="width:auto;margin-right:12px"
+                   {% if 'planos' in atuais %}checked{% endif %}>
+            💳 Planos
+          </label>
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="financeiro"
+                   style="width:auto;margin-right:12px"
+                   {% if 'financeiro' in atuais %}checked{% endif %}>
+            💰 Financeiro
+          </label>
+
+          <label style="display:block;margin-bottom:16px">
+            <input type="checkbox" name="permissoes" value="aulas"
+                   style="width:auto;margin-right:12px"
+                   {% if 'aulas' in atuais %}checked{% endif %}>
+            📅 Aulas
+          </label>
+
+          <label style="display:block;margin-bottom:4px">
+            <input type="checkbox" name="permissoes" value="avaliacoes"
+                   style="width:auto;margin-right:12px"
+                   {% if 'avaliacoes' in atuais %}checked{% endif %}>
+            📈 Avaliações
+          </label>
+
+        </div>
+
+        <button class="green" style="width:100%;margin-top:20px">
+          Salvar alterações
+        </button>
+
+      </form>
+
+    </div>
+    """, u=u, erro=erro)
+
+
+@app.route("/usuarios/<int:id>/status", methods=["POST"])
+@login_required
+def usuario_status(id):
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Apenas o dono da academia pode gerenciar usuários.")
+        return redirect("/")
+
+    con = db()
+
+    u = con.cursor().execute(
+        """SELECT id,perfil,ativo
+           FROM usuarios
+           WHERE id=%s AND academia_id=%s""",
+        (id,aid())
+    ).fetchone()
+
+    if not u:
+        con.close()
+        return redirect("/usuarios")
+
+    if str(u["perfil"]).upper() == "DONO":
+        con.close()
+        flash("O usuário DONO não pode ser desativado.")
+        return redirect("/usuarios")
+
+    novo_status = 0 if u["ativo"] else 1
+
+    con.cursor().execute(
+        """UPDATE usuarios
+           SET ativo=%s
+           WHERE id=%s AND academia_id=%s""",
+        (novo_status,id,aid())
+    )
+
+    con.commit()
+    con.close()
+
+    return redirect("/usuarios")
+
+
 @app.route("/config", methods=["GET","POST"])
 @login_required
+@permissao_required("config")
 def config():
     con=db()
     if request.method=="POST":
@@ -2066,7 +3489,20 @@ def config():
     <label>Telefone</label><input name="telefone" value="{{ac.telefone or ''}}"><label>Endereço</label><input name="endereco" value="{{ac.endereco or ''}}">
     <label>Cor principal</label><input type="color" name="cor" value="{{ac.cor or '#111827'}}"><button class="green">Salvar</button></form></div>
     <div class="card"><h2>Modalidades disponíveis</h2>{% for m in mods %}<span class="pill">{{m.nome}}</span> {% endfor %}
-    <p class="muted">A estrutura aceita modalidades diferentes por academia.</p><h3>Plano do sistema</h3><p>{{ac.plano}}</p></div></div>""",ac=ac,mods=mods)
+    <p class="muted">A estrutura aceita modalidades diferentes por academia.</p>
+    <h3>Plano do sistema</h3><p>{{ac.plano}}</p>
+
+    {% if session.get('perfil') == 'DONO' %}
+    <hr style="margin:28px 0">
+    <h2>👥 Equipe e acessos</h2>
+    <p class="muted">Cadastre administradores, professores e funcionários.</p>
+    <a class="btn green" href="/usuarios"
+       style="display:flex;align-items:center;justify-content:center;width:100%;font-size:26px;font-weight:800;min-height:70px">
+       👥 Usuários e funcionários
+    </a>
+    {% endif %}
+
+    </div></div>""",ac=ac,mods=mods)
 
 # Inicializa o banco também quando o aplicativo é carregado pelo Gunicorn/Render.
 # init_db usa CREATE TABLE IF NOT EXISTS, portanto pode ser executado com segurança.
