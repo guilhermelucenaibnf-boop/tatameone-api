@@ -13,6 +13,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tatameone-2-troque-em-producao")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Administração geral do TatameOne.
+# As credenciais ficam nas variáveis de ambiente do Render,
+# nunca gravadas diretamente no código.
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "").strip().lower()
+SUPERADMIN_SENHA = os.environ.get("SUPERADMIN_SENHA", "")
+
 def db():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL não configurada no Render.")
@@ -144,6 +150,15 @@ def permissao_required(area):
             return fn(*a, **kw)
         return wrap
     return decorator
+
+def superadmin_required(fn):
+    @wraps(fn)
+    def wrap(*a, **kw):
+        if not session.get("superadmin"):
+            return redirect("/gestao-tatameone/login")
+        return fn(*a, **kw)
+    return wrap
+
 
 def aid():
     return session.get("academia_id")
@@ -526,6 +541,693 @@ def primeiro_acesso():
       </form>
     </div>
     """, erro=erro)
+
+
+@app.route("/gestao-tatameone/login", methods=["GET","POST"])
+def superadmin_login():
+    if session.get("superadmin"):
+        return redirect("/gestao-tatameone")
+
+    erro = ""
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+
+        if not SUPERADMIN_EMAIL or not SUPERADMIN_SENHA:
+            erro = "Administração geral ainda não configurada."
+        elif email == SUPERADMIN_EMAIL and secrets.compare_digest(
+            senha,
+            SUPERADMIN_SENHA
+        ):
+            session.clear()
+            session["superadmin"] = True
+            session["nome"] = "Administração TatameOne"
+
+            return redirect("/gestao-tatameone")
+        else:
+            erro = "E-mail ou senha inválidos."
+
+    return page("Administração TatameOne","""
+    <div class="card"
+         style="max-width:650px;width:94%;margin:6vh auto;
+                padding:32px;border-radius:24px">
+
+      <h1>🛡️ Administração TatameOne</h1>
+
+      <p class="muted">
+        Acesso exclusivo da administração geral do sistema.
+      </p>
+
+      {% if erro %}
+      <div style="color:#dc2626;font-size:23px;margin:18px 0">
+        {{erro}}
+      </div>
+      {% endif %}
+
+      <form method="post">
+
+        <label>E-mail administrativo</label>
+        <input name="email"
+               type="email"
+               autocomplete="username"
+               required>
+
+        <label>Senha</label>
+        <input name="senha"
+               type="password"
+               autocomplete="current-password"
+               required>
+
+        <button class="green"
+                style="width:100%;font-size:26px;
+                       min-height:68px;font-weight:800">
+          Entrar na administração
+        </button>
+
+      </form>
+    </div>
+    """, erro=erro)
+
+
+@app.route("/gestao-tatameone/logout")
+def superadmin_logout():
+    session.clear()
+    return redirect("/gestao-tatameone/login")
+
+
+@app.route("/gestao-tatameone", methods=["GET","POST"])
+@superadmin_required
+def superadmin_painel():
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    if request.method == "POST":
+        academia = request.form.get("academia", "").strip()
+        proprietario = request.form.get("proprietario", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "").strip()
+        plano = request.form.get("plano", "GRATUITO").strip().upper()
+
+        planos_validos = {
+            "GRATUITO",
+            "BASICO",
+            "PRO",
+            "PREMIUM"
+        }
+
+        if plano not in planos_validos:
+            plano = "GRATUITO"
+
+        if not academia or not proprietario or not email or not senha:
+            erro = "Preencha academia, proprietário, e-mail e senha."
+
+        elif len(senha) < 4:
+            erro = "A senha inicial deve possuir pelo menos 4 caracteres."
+
+        else:
+            existente = con.cursor().execute(
+                """SELECT id
+                   FROM usuarios
+                   WHERE lower(email)=lower(%s)""",
+                (email,)
+            ).fetchone()
+
+            if existente:
+                erro = "Este e-mail já está cadastrado no TatameOne."
+
+            else:
+                try:
+                    cur = con.cursor()
+
+                    cur.execute(
+                        """INSERT INTO academias
+                           (nome,plano,ativo,criado_em)
+                           VALUES(%s,%s,1,%s)
+                           RETURNING id""",
+                        (academia, plano, agora())
+                    )
+
+                    academia_id = cur.fetchone()["id"]
+
+                    cur.execute(
+                        """INSERT INTO usuarios
+                           (academia_id,nome,email,senha,
+                            perfil,ativo,criado_em)
+                           VALUES(%s,%s,%s,%s,'DONO',1,%s)""",
+                        (
+                            academia_id,
+                            proprietario,
+                            email,
+                            senha,
+                            agora()
+                        )
+                    )
+
+                    for modalidade in (
+                        "Musculação",
+                        "Jiu-Jítsu",
+                        "Muay Thai",
+                        "Boxe",
+                        "Funcional",
+                        "Cross Training",
+                        "Pilates",
+                        "Yoga",
+                        "Dança",
+                        "Natação",
+                        "Personal"
+                    ):
+                        cur.execute(
+                            """INSERT INTO modalidades
+                               (academia_id,nome)
+                               VALUES(%s,%s)""",
+                            (academia_id, modalidade)
+                        )
+
+                    cur.execute(
+                        """INSERT INTO planos
+                           (academia_id,nome,valor,
+                            periodicidade,descricao)
+                           VALUES(%s,%s,%s,%s,%s)""",
+                        (
+                            academia_id,
+                            "Plano Gratuito",
+                            0,
+                            "MENSAL",
+                            "Plano sem cobrança"
+                        )
+                    )
+
+                    con.commit()
+                    sucesso = "Academia criada com sucesso."
+
+                except Exception:
+                    con.rollback()
+                    erro = "Não foi possível criar a academia."
+
+    academias = con.cursor().execute(
+        """SELECT
+               a.id,
+               a.nome,
+               a.plano,
+               a.ativo,
+               a.criado_em,
+               u.id AS dono_id,
+               u.nome AS dono_nome,
+               u.email AS dono_email,
+               u.ativo AS dono_ativo
+           FROM academias a
+           LEFT JOIN usuarios u
+             ON u.academia_id=a.id
+            AND upper(u.perfil)='DONO'
+           ORDER BY a.id DESC"""
+    ).fetchall()
+
+    con.close()
+
+    return page("Gestão TatameOne","""
+    <h1>🛡️ Administração Geral</h1>
+
+    <p class="muted">
+      Gerenciamento das empresas que utilizam o TatameOne.
+    </p>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:20px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card"
+         style="color:#16a34a;margin-bottom:20px">
+      {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="grid">
+
+      <div class="card">
+
+        <h2>➕ Nova academia</h2>
+
+        <form method="post">
+
+          <label>Nome da academia</label>
+          <input name="academia" required>
+
+          <label>Nome do proprietário</label>
+          <input name="proprietario" required>
+
+          <label>E-mail do proprietário</label>
+          <input name="email"
+                 type="email"
+                 autocomplete="off"
+                 required>
+
+          <label>Senha inicial</label>
+          <input name="senha"
+                 type="password"
+                 autocomplete="new-password"
+                 required>
+
+          <label>Plano do sistema</label>
+          <select name="plano">
+            <option value="GRATUITO">Gratuito</option>
+            <option value="BASICO">Básico</option>
+            <option value="PRO">Pro</option>
+            <option value="PREMIUM">Premium</option>
+          </select>
+
+          <button class="green"
+                  style="width:100%;font-size:25px;
+                         min-height:65px;font-weight:800">
+            Criar academia
+          </button>
+
+        </form>
+
+      </div>
+
+
+      <div class="card">
+
+        <h2>🏢 Academias cadastradas</h2>
+
+        <p class="muted">
+          Total: {{academias|length}}
+        </p>
+
+        {% for a in academias %}
+
+        <div style="
+             padding:20px 0;
+             border-bottom:1px solid #ddd">
+
+          <h2 style="margin-bottom:8px">
+            {{a.nome}}
+          </h2>
+
+          <p>
+            Plano:
+            <b>{{a.plano}}</b>
+          </p>
+
+          {% if a.ativo %}
+            <span class="pill">ACADEMIA ATIVA</span>
+          {% else %}
+            <span class="pill"
+                  style="background:#fee2e2">
+              ACADEMIA BLOQUEADA
+            </span>
+          {% endif %}
+
+          <p style="margin-top:16px">
+            <b>Proprietário:</b><br>
+            {{a.dono_nome or 'Não localizado'}}<br>
+            {{a.dono_email or '-'}}
+          </p>
+
+          <div class="actions"
+               style="margin-top:16px">
+
+            <a class="btn"
+               href="/gestao-tatameone/academia/{{a.id}}">
+              ⚙️ Gerenciar
+            </a>
+
+          </div>
+
+        </div>
+
+        {% else %}
+
+        <p class="muted">
+          Nenhuma academia cadastrada.
+        </p>
+
+        {% endfor %}
+
+      </div>
+
+    </div>
+
+    <div style="margin-top:25px">
+
+      <a class="btn danger"
+         href="/gestao-tatameone/logout">
+        🚪 Sair da administração
+      </a>
+
+    </div>
+    """,
+    academias=academias,
+    erro=erro,
+    sucesso=sucesso)
+
+
+@app.route(
+    "/gestao-tatameone/academia/<int:id>",
+    methods=["GET","POST"]
+)
+@superadmin_required
+def superadmin_academia(id):
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    academia = con.cursor().execute(
+        """SELECT *
+           FROM academias
+           WHERE id=%s""",
+        (id,)
+    ).fetchone()
+
+    if not academia:
+        con.close()
+        return redirect("/gestao-tatameone")
+
+    dono = con.cursor().execute(
+        """SELECT id,nome,email,ativo
+           FROM usuarios
+           WHERE academia_id=%s
+             AND upper(perfil)='DONO'
+           ORDER BY id
+           LIMIT 1""",
+        (id,)
+    ).fetchone()
+
+    if request.method == "POST":
+
+        acao = request.form.get("acao", "")
+
+        if acao == "salvar":
+
+            nome_academia = request.form.get(
+                "academia",
+                ""
+            ).strip()
+
+            nome_dono = request.form.get(
+                "proprietario",
+                ""
+            ).strip()
+
+            email = request.form.get(
+                "email",
+                ""
+            ).strip().lower()
+
+            plano = request.form.get(
+                "plano",
+                "GRATUITO"
+            ).strip().upper()
+
+            nova_senha = request.form.get(
+                "nova_senha",
+                ""
+            ).strip()
+
+            if plano not in (
+                "GRATUITO",
+                "BASICO",
+                "PRO",
+                "PREMIUM"
+            ):
+                plano = "GRATUITO"
+
+            if not nome_academia:
+                erro = "Informe o nome da academia."
+
+            elif dono and (not nome_dono or not email):
+                erro = "Informe nome e e-mail do proprietário."
+
+            else:
+
+                email_em_uso = None
+
+                if dono:
+                    email_em_uso = con.cursor().execute(
+                        """SELECT id
+                           FROM usuarios
+                           WHERE lower(email)=lower(%s)
+                             AND id<>%s""",
+                        (email, dono["id"])
+                    ).fetchone()
+
+                if email_em_uso:
+                    erro = "Este e-mail já está sendo utilizado."
+
+                else:
+                    con.cursor().execute(
+                        """UPDATE academias
+                           SET nome=%s,
+                               plano=%s
+                           WHERE id=%s""",
+                        (
+                            nome_academia,
+                            plano,
+                            id
+                        )
+                    )
+
+                    if dono:
+
+                        if nova_senha:
+                            con.cursor().execute(
+                                """UPDATE usuarios
+                                   SET nome=%s,
+                                       email=%s,
+                                       senha=%s
+                                   WHERE id=%s
+                                     AND academia_id=%s""",
+                                (
+                                    nome_dono,
+                                    email,
+                                    nova_senha,
+                                    dono["id"],
+                                    id
+                                )
+                            )
+
+                        else:
+                            con.cursor().execute(
+                                """UPDATE usuarios
+                                   SET nome=%s,
+                                       email=%s
+                                   WHERE id=%s
+                                     AND academia_id=%s""",
+                                (
+                                    nome_dono,
+                                    email,
+                                    dono["id"],
+                                    id
+                                )
+                            )
+
+                    con.commit()
+                    sucesso = "Dados atualizados com sucesso."
+
+        elif acao == "status":
+
+            novo_status = 0 if academia["ativo"] else 1
+
+            con.cursor().execute(
+                """UPDATE academias
+                   SET ativo=%s
+                   WHERE id=%s""",
+                (novo_status, id)
+            )
+
+            con.commit()
+
+            sucesso = (
+                "Academia ativada."
+                if novo_status
+                else "Academia bloqueada."
+            )
+
+    academia = con.cursor().execute(
+        """SELECT *
+           FROM academias
+           WHERE id=%s""",
+        (id,)
+    ).fetchone()
+
+    dono = con.cursor().execute(
+        """SELECT id,nome,email,ativo
+           FROM usuarios
+           WHERE academia_id=%s
+             AND upper(perfil)='DONO'
+           ORDER BY id
+           LIMIT 1""",
+        (id,)
+    ).fetchone()
+
+    con.close()
+
+    return page("Gerenciar academia","""
+    <h1>🏢 Gerenciar academia</h1>
+
+    {% if erro %}
+    <div class="card"
+         style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card"
+         style="color:#16a34a;margin-bottom:18px">
+      {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="card">
+
+      <form method="post">
+
+        <input type="hidden"
+               name="acao"
+               value="salvar">
+
+        <label>Nome da academia</label>
+        <input name="academia"
+               value="{{academia.nome}}"
+               required>
+
+        <label>Plano</label>
+        <select name="plano">
+
+          {% for plano in
+             ['GRATUITO','BASICO','PRO','PREMIUM'] %}
+
+          <option value="{{plano}}"
+            {% if academia.plano == plano %}
+              selected
+            {% endif %}>
+            {{plano}}
+          </option>
+
+          {% endfor %}
+
+        </select>
+
+        {% if dono %}
+
+        <hr style="margin:28px 0">
+
+        <h2>👤 Proprietário</h2>
+
+        <label>Nome</label>
+        <input name="proprietario"
+               value="{{dono.nome}}"
+               required>
+
+        <label>E-mail</label>
+        <input name="email"
+               type="email"
+               value="{{dono.email}}"
+               required>
+
+        <label>Nova senha</label>
+        <input name="nova_senha"
+               type="password"
+               autocomplete="new-password">
+
+        <p class="muted">
+          Deixe a nova senha vazia para manter a atual.
+        </p>
+
+        {% else %}
+
+        <div class="card"
+             style="background:#fef2f2">
+          Proprietário DONO não localizado.
+        </div>
+
+        {% endif %}
+
+        <button class="green"
+                style="width:100%;
+                       min-height:65px;
+                       font-size:25px">
+          💾 Salvar alterações
+        </button>
+
+      </form>
+
+    </div>
+
+    <div class="card"
+         style="margin-top:20px">
+
+      <h2>Estado da academia</h2>
+
+      {% if academia.ativo %}
+
+      <p>
+        🟢 Academia atualmente ativa.
+      </p>
+
+      <form method="post"
+            onsubmit="return confirm(
+              'Bloquear esta academia?'
+            );">
+
+        <input type="hidden"
+               name="acao"
+               value="status">
+
+        <button class="danger"
+                style="width:100%;
+                       min-height:65px;
+                       font-size:24px">
+          ⛔ Bloquear academia
+        </button>
+
+      </form>
+
+      {% else %}
+
+      <p>
+        🔴 Academia atualmente bloqueada.
+      </p>
+
+      <form method="post">
+
+        <input type="hidden"
+               name="acao"
+               value="status">
+
+        <button class="green"
+                style="width:100%;
+                       min-height:65px;
+                       font-size:24px">
+          ✅ Reativar academia
+        </button>
+
+      </form>
+
+      {% endif %}
+
+    </div>
+
+    <div style="margin-top:22px">
+
+      <a class="btn"
+         href="/gestao-tatameone">
+        ← Voltar para Administração Geral
+      </a>
+
+    </div>
+    """,
+    academia=academia,
+    dono=dono,
+    erro=erro,
+    sucesso=sucesso)
 
 
 @app.route("/login", methods=["GET","POST"])
