@@ -312,6 +312,11 @@ h2{font-size:32px}
     max-width:100%;
   }
 
+  /* SOMENTE TÍTULOS LONGOS */
+  .nav-title.long-title{
+    font-size:31px;
+  }
+
   .nav-desc{
     font-size:21px;
     max-width:100%;
@@ -361,7 +366,7 @@ h2{font-size:32px}
 {% if tem_permissao('financeiro') %}<a class="btn light" href="/financeiro"><span class="nav-icon">💰</span><span class="nav-copy"><span class="nav-title">Financeiro</span><span class="nav-desc">Pagamentos e recebimentos</span></span><span class="nav-arrow">›</span></a>{% endif %}
 {% if tem_permissao('aulas') %}<a class="btn light" href="/aulas"><span class="nav-icon">📅</span><span class="nav-copy"><span class="nav-title">Aulas</span><span class="nav-desc">Agenda, horários e professores</span></span><span class="nav-arrow">›</span></a>{% endif %}
 {% if tem_permissao('avaliacoes') %}<a class="btn light" href="/avaliacoes"><span class="nav-icon">📈</span><span class="nav-copy"><span class="nav-title">Avaliações</span><span class="nav-desc">Avaliações e evolução</span></span><span class="nav-arrow">›</span></a>{% endif %}
-{% if tem_permissao('config') %}<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if tem_permissao('config') %}<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title long-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>{% endif %}
 <a class="btn danger" href="/logout"><span class="nav-icon">🚪</span><span class="nav-copy"><span class="nav-title">Sair</span><span class="nav-desc">Encerrar sessão</span></span><span class="nav-arrow">›</span></a>
 </div></div>
 {% endif %}
@@ -372,43 +377,7 @@ h2{font-size:32px}
 {% endif %}
 <div class="wrap">{{body|safe}}</div>
 
-{% if session.get('uid') and request.path == '/' %}
-<div id="diag-tatameone"
-style="
-position:fixed;
-bottom:6px;
-left:6px;
-right:6px;
-z-index:99999;
-background:#111827;
-color:white;
-padding:8px;
-border-radius:8px;
-font-size:13px;
-text-align:center;
-opacity:.92;
-">
-MEDINDO TELA...
-</div>
 
-<script>
-(function(){
-    function medir(){
-        var vv = window.visualViewport;
-        var texto =
-            "IW:" + window.innerWidth +
-            " | SW:" + screen.width +
-            " | DPR:" + window.devicePixelRatio +
-            " | VV:" + (vv ? Math.round(vv.width) : "N/A");
-
-        document.getElementById("diag-tatameone").textContent = texto;
-    }
-
-    medir();
-    window.addEventListener("resize", medir);
-})();
-</script>
-{% endif %}
 
 </body></html>
 """
