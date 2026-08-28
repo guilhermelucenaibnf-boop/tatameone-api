@@ -3370,6 +3370,16 @@ def financeiro_comprovante(id):
     text-align:center;
 }
 
+.recibo-logo{
+    display:block;
+    max-width:150px;
+    max-height:85px;
+    width:auto;
+    height:auto;
+    object-fit:contain;
+    margin:0 auto 8px auto;
+}
+
 .recibo-cabecalho h2{
     margin:4px 0;
     font-size:22px;
@@ -3457,6 +3467,16 @@ def financeiro_comprovante(id):
         font-size:10px !important;
     }
 
+    #recibo .recibo-logo{
+        display:block !important;
+        max-width:34mm !important;
+        max-height:18mm !important;
+        width:auto !important;
+        height:auto !important;
+        object-fit:contain !important;
+        margin:0 auto 2mm auto !important;
+    }
+
     #recibo h2{
         font-size:15px !important;
     }
@@ -3490,6 +3510,12 @@ def financeiro_comprovante(id):
 <div id="recibo" class="recibo">
 
     <div class="recibo-cabecalho">
+
+        {% if academia.logo %}
+        <img class="recibo-logo"
+             src="/static/logos/{{academia.logo}}"
+             alt="Logo {{academia.nome}}">
+        {% endif %}
 
         <h2>{{ academia.nome }}</h2>
 
@@ -5557,6 +5583,35 @@ def config():
     con=db()
     if request.method=="POST":
         f=request.form
+
+        # Logo própria da academia
+        logo_atual = con.cursor().execute(
+            "SELECT logo FROM academias WHERE id=%s",
+            (aid(),)
+        ).fetchone()
+
+        logo_nome = logo_atual["logo"] if logo_atual else None
+        logo = request.files.get("logo")
+
+        if logo and logo.filename:
+            extensao = os.path.splitext(logo.filename)[1].lower()
+
+            if extensao in (".png", ".jpg", ".jpeg", ".webp"):
+                os.makedirs("static/logos", exist_ok=True)
+
+                logo_nome = "academia_%s%s" % (
+                    aid(),
+                    extensao
+                )
+
+                logo.save(
+                    os.path.join(
+                        "static",
+                        "logos",
+                        logo_nome
+                    )
+                )
+
         con.cursor().execute("""
             UPDATE academias
             SET nome=%s,
@@ -5564,6 +5619,7 @@ def config():
                 telefone=%s,
                 endereco=%s,
                 cor=%s,
+                logo=%s,
                 pix_ativo=%s,
                 pix_tipo_chave=%s,
                 pix_chave=%s,
@@ -5576,6 +5632,7 @@ def config():
             f.get("telefone"),
             f.get("endereco"),
             f.get("cor"),
+            logo_nome,
             1 if f.get("pix_ativo") else 0,
             f.get("pix_tipo_chave"),
             f.get("pix_chave","").strip(),
@@ -5588,11 +5645,39 @@ def config():
     mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
     con.close()
     return page("Configurações","""
-    <h1>Configurações</h1><div class="grid"><div class="card"><h2>Academia</h2><form method="post">
+    <h1>Configurações</h1><div class="grid"><div class="card"><h2>Academia</h2><form method="post" enctype="multipart/form-data">
     <label>Nome</label><input name="nome" value="{{ac.nome}}" required><label>CNPJ/CPF</label><input name="documento" value="{{ac.documento or ''}}">
     <label>Telefone</label><input name="telefone" value="{{ac.telefone or ''}}"><label>Endereço</label><input name="endereco" value="{{ac.endereco or ''}}">
     <label>Cor principal</label>
     <input type="color" name="cor" value="{{ac.cor or '#111827'}}">
+
+    <hr style="margin:24px 0">
+
+    <h2>🖼️ Logo da academia</h2>
+
+    <p class="muted">
+      A logo será utilizada nos comprovantes de pagamento.
+    </p>
+
+    {% if ac.logo %}
+    <div style="text-align:center;margin:15px 0">
+      <img src="/static/logos/{{ac.logo}}"
+           alt="Logo da academia"
+           style="max-width:220px;
+                  max-height:120px;
+                  object-fit:contain">
+    </div>
+    {% endif %}
+
+    <label>Selecionar logo</label>
+
+    <input type="file"
+           name="logo"
+           accept="image/png,image/jpeg,image/webp">
+
+    <p class="muted">
+      Formatos aceitos: PNG, JPG, JPEG ou WEBP.
+    </p>
 
     <hr style="margin:28px 0">
 
