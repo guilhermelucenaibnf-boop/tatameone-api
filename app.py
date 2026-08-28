@@ -37,7 +37,10 @@ def icon_512():
     return send_from_directory("public", "icon-512.png", mimetype="image/png")
 
 def agora():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from zoneinfo import ZoneInfo
+    return datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime("%Y-%m-%d %H:%M:%S")
 
 def init_db():
     con=db()
@@ -57,6 +60,7 @@ def init_db():
 """CREATE TABLE IF NOT EXISTS treinos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,aluno_id BIGINT NOT NULL,titulo TEXT NOT NULL,descricao TEXT,criado_em TEXT NOT NULL)""",
 """CREATE TABLE IF NOT EXISTS caixa(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,tipo TEXT NOT NULL,descricao TEXT,valor DOUBLE PRECISION NOT NULL,forma TEXT,data TEXT NOT NULL)""",
 """CREATE TABLE IF NOT EXISTS avisos(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,titulo TEXT NOT NULL,mensagem TEXT NOT NULL,criado_em TEXT NOT NULL)""",
+"""CREATE TABLE IF NOT EXISTS avisos_gerais(id BIGSERIAL PRIMARY KEY,titulo TEXT NOT NULL,mensagem TEXT NOT NULL,criado_em TEXT NOT NULL)""",
 """CREATE TABLE IF NOT EXISTS pre_cadastros(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,documento TEXT,nascimento TEXT,telefone TEXT,email TEXT,responsavel TEXT,telefone_responsavel TEXT,modalidade TEXT,graduacao TEXT,observacoes TEXT,status TEXT DEFAULT 'PENDENTE',criado_em TEXT NOT NULL,endereco TEXT,contato_emergencia TEXT,telefone_emergencia TEXT,foto TEXT)"""
     ]
     for sql in comandos: cur.execute(sql)
@@ -222,7 +226,24 @@ BASE = """
 <meta name="theme-color" content="#e52e3d">
 <style>
 *{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
-.top{background:#111827;color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0}
+.top{background:#111827;color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1000}
+.top-left{display:flex;align-items:center;gap:18px;min-width:0}
+.top-clock{display:flex;align-items:center;gap:10px;border-left:1px solid rgba(255,255,255,.35);padding-left:18px;white-space:nowrap}
+.clock-icon{font-size:32px}
+.clock-time{font-size:24px;font-weight:900;line-height:1}
+.clock-date{font-size:12px;margin-top:5px;color:#e5e7eb}
+.top-user{font-size:18px;text-align:right}
+
+@media(max-width:700px){
+  .top{padding:10px 12px;gap:8px}
+  .top-left{gap:8px;flex:1}
+  .brand img{width:150px !important;height:58px !important;max-width:42vw !important}
+  .top-clock{gap:5px;padding-left:8px}
+  .clock-icon{font-size:21px}
+  .clock-time{font-size:17px}
+  .clock-date{font-size:9px}
+  .top-user{font-size:13px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+}
 .brand{font-size:21px;font-weight:800}.brand b{color:#22c55e}
 .wrap{max-width:1150px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .card{background:white;border-radius:16px;padding:16px;box-shadow:0 2px 12px #00000010}
@@ -378,7 +399,30 @@ h2{font-size:32px}
 }
 
 </style></head><body>
-<div class="top"><div class="brand"><img src="/static/img/logo_tatameone.png" alt="TatameOne" style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block"></div><div>{{session.get('nome','')}}</div></div>
+<div class="top">
+  <div class="top-left">
+
+    <div class="brand">
+      <img src="/static/img/logo_tatameone.png"
+           alt="TatameOne"
+           style="height:72px;width:clamp(230px,55vw,420px);max-width:65vw;object-fit:contain;object-position:left center;display:block">
+    </div>
+
+    <div class="top-clock">
+      <div class="clock-icon">🕐</div>
+
+      <div>
+        <div id="tatameClock" class="clock-time">--:--:--</div>
+        <div id="tatameDate" class="clock-date"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="top-user">
+    {{session.get('nome','')}}
+  </div>
+</div>
 {% if session.get('uid') and request.path == '/' %}
 <div class="nav-wrap"><div class="nav">
 {% if tem_permissao('painel') %}<a class="btn light" href="/painel"><span class="nav-icon">📊</span><span class="nav-copy"><span class="nav-title">Painel</span><span class="nav-desc">Visão geral da academia</span></span><span class="nav-arrow">›</span></a>{% endif %}
@@ -388,6 +432,7 @@ h2{font-size:32px}
 {% if tem_permissao('financeiro') %}<a class="btn light" href="/financeiro"><span class="nav-icon">💰</span><span class="nav-copy"><span class="nav-title">Financeiro</span><span class="nav-desc">Pagamentos e recebimentos</span></span><span class="nav-arrow">›</span></a>{% endif %}
 {% if tem_permissao('aulas') %}<a class="btn light" href="/aulas"><span class="nav-icon">📅</span><span class="nav-copy"><span class="nav-title">Aulas</span><span class="nav-desc">Agenda, horários e professores</span></span><span class="nav-arrow">›</span></a>{% endif %}
 {% if tem_permissao('avaliacoes') %}<a class="btn light" href="/avaliacoes"><span class="nav-icon">📈</span><span class="nav-copy"><span class="nav-title">Avaliações</span><span class="nav-desc">Avaliações e evolução</span></span><span class="nav-arrow">›</span></a>{% endif %}
+{% if session.get('perfil','')|upper == 'DONO' %}<a class="btn light" href="/anuncios"><span class="nav-icon">📢</span><span class="nav-copy"><span class="nav-title">Anúncios</span><span class="nav-desc">Comunicados da academia</span></span><span class="nav-arrow">›</span></a>{% endif %}
 {% if tem_permissao('config') %}<a class="btn light" href="/config"><span class="nav-icon">⚙️</span><span class="nav-copy"><span class="nav-title long-title">Configurações</span><span class="nav-desc">Dados e modalidades</span></span><span class="nav-arrow">›</span></a>{% endif %}
 <a class="btn danger" href="/logout"><span class="nav-icon">🚪</span><span class="nav-copy"><span class="nav-title">Sair</span><span class="nav-desc">Encerrar sessão</span></span><span class="nav-arrow">›</span></a>
 </div></div>
@@ -398,6 +443,51 @@ h2{font-size:32px}
 </div>
 {% endif %}
 <div class="wrap">{{body|safe}}</div>
+
+<script>
+(function(){
+
+  function atualizarRelogio(){
+
+    const agora = new Date();
+
+    const hora = new Intl.DateTimeFormat(
+      'pt-BR',
+      {
+        timeZone:'America/Sao_Paulo',
+        hour:'2-digit',
+        minute:'2-digit',
+        second:'2-digit',
+        hour12:false
+      }
+    ).format(agora);
+
+    const data = new Intl.DateTimeFormat(
+      'pt-BR',
+      {
+        timeZone:'America/Sao_Paulo',
+        weekday:'short',
+        day:'2-digit',
+        month:'2-digit',
+        year:'numeric'
+      }
+    ).format(agora);
+
+    const relogio =
+      document.getElementById('tatameClock');
+
+    const dataEl =
+      document.getElementById('tatameDate');
+
+    if(relogio) relogio.textContent = hora;
+    if(dataEl) dataEl.textContent = data;
+  }
+
+  atualizarRelogio();
+  setInterval(atualizarRelogio,1000);
+
+})();
+</script>
 
 
 
@@ -890,6 +980,12 @@ def superadmin_painel():
 
     <div style="margin-top:25px">
 
+      <a class="btn"
+         href="/gestao-tatameone/anuncios"
+         style="margin-right:10px">
+        🌐 Anúncios Gerais
+      </a>
+
       <a class="btn danger"
          href="/gestao-tatameone/logout">
         🚪 Sair da administração
@@ -900,6 +996,128 @@ def superadmin_painel():
     academias=academias,
     erro=erro,
     sucesso=sucesso)
+
+
+
+@app.route("/gestao-tatameone/anuncios", methods=["GET","POST"])
+@superadmin_required
+def superadmin_anuncios():
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    if request.method == "POST":
+        titulo = request.form.get("titulo", "").strip()
+        mensagem = request.form.get("mensagem", "").strip()
+
+        if not titulo or not mensagem:
+            erro = "Preencha o título e a mensagem."
+        else:
+            con.cursor().execute(
+                """INSERT INTO avisos_gerais
+                   (titulo,mensagem,criado_em)
+                   VALUES(%s,%s,%s)""",
+                (titulo, mensagem, agora())
+            )
+            con.commit()
+            sucesso = "Anúncio geral publicado para todas as academias."
+
+    rows = con.cursor().execute(
+        """SELECT *
+           FROM avisos_gerais
+           ORDER BY id DESC"""
+    ).fetchall()
+
+    con.close()
+
+    return page("Anúncios Gerais", """
+    <h1>🌐 Anúncios Gerais TatameOne</h1>
+
+    <p class="muted">
+      Estes anúncios aparecem para todas as academias,
+      nos planos Gratuito, Básico, Pro e Premium.
+    </p>
+
+    {% if erro %}
+    <div class="card" style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card" style="color:#16a34a;margin-bottom:18px">
+      {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:22px">
+      <h2>📣 Publicar para todas as academias</h2>
+
+      <form method="post">
+        <label>Título</label>
+        <input name="titulo"
+               maxlength="150"
+               required>
+
+        <label>Mensagem</label>
+        <textarea name="mensagem"
+                  rows="6"
+                  required></textarea>
+
+        <button class="green"
+                style="width:100%;font-size:24px;
+                       min-height:62px;font-weight:800">
+          🌐 Publicar anúncio geral
+        </button>
+      </form>
+    </div>
+
+    <h2>📋 Anúncios gerais publicados</h2>
+
+    {% for a in rows %}
+    <div class="card" style="margin-bottom:14px">
+      <h2>{{a.titulo}}</h2>
+
+      <div style="font-size:19px;white-space:pre-wrap">
+        {{a.mensagem}}
+      </div>
+
+      <p class="muted">{{a.criado_em}}</p>
+
+      <a class="btn danger"
+         href="/gestao-tatameone/anuncios/{{a.id}}/excluir"
+         onclick="return confirm('Excluir este anúncio geral?')">
+        🗑️ Excluir
+      </a>
+    </div>
+    {% else %}
+    <div class="card">
+      Nenhum anúncio geral publicado.
+    </div>
+    {% endfor %}
+
+    <div style="margin-top:22px">
+      <a class="btn" href="/gestao-tatameone">
+        ← Voltar à Administração
+      </a>
+    </div>
+    """, rows=rows, erro=erro, sucesso=sucesso)
+
+
+@app.route("/gestao-tatameone/anuncios/<int:id>/excluir")
+@superadmin_required
+def superadmin_excluir_anuncio(id):
+    con = db()
+
+    con.cursor().execute(
+        "DELETE FROM avisos_gerais WHERE id=%s",
+        (id,)
+    )
+
+    con.commit()
+    con.close()
+
+    return redirect("/gestao-tatameone/anuncios")
 
 
 @app.route(
@@ -1304,7 +1522,65 @@ def logout():
 @app.route("/")
 @login_required
 def inicio():
-    return page("Início", "")
+    con = db()
+
+    gerais = con.cursor().execute(
+        """SELECT *
+           FROM avisos_gerais
+           ORDER BY id DESC
+           LIMIT 5"""
+    ).fetchall()
+
+    locais = con.cursor().execute(
+        """SELECT *
+           FROM avisos
+           WHERE academia_id=%s
+           ORDER BY id DESC
+           LIMIT 5""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    return page("Início", """
+    {% if gerais or locais %}
+    <div style="margin-top:28px">
+
+      <h1>📢 Anúncios</h1>
+
+      {% for a in gerais %}
+      <div class="card"
+           style="margin-bottom:14px;border-left:7px solid #e52e3d">
+        <div class="pill">🌐 TATAMEONE</div>
+        <h2 style="margin-bottom:8px">{{a.titulo}}</h2>
+        <div style="font-size:20px;white-space:pre-wrap">
+          {{a.mensagem}}
+        </div>
+        <p class="muted" style="margin-bottom:0">
+          {{a.criado_em}}
+        </p>
+      </div>
+      {% endfor %}
+
+      {% for a in locais %}
+      <div class="card"
+           style="margin-bottom:14px;border-left:7px solid #2563eb">
+        <div class="pill">🏢 ACADEMIA</div>
+        <h2 style="margin-bottom:8px">{{a.titulo}}</h2>
+        <div style="font-size:20px;white-space:pre-wrap">
+          {{a.mensagem}}
+        </div>
+        <p class="muted" style="margin-bottom:0">
+          {{a.criado_em}}
+        </p>
+      </div>
+      {% endfor %}
+
+    </div>
+    {% endif %}
+
+    
+    """, gerais=gerais, locais=locais)
 
 @app.route("/painel")
 @login_required
@@ -1353,6 +1629,136 @@ def dashboard():
     <a class="btn" href="/checkin">✓ Fazer check-in</a><a class="btn" href="/financeiro">R$ Registrar pagamento</a></div>
 </div>
     """,s=stats,ac=ac)
+
+
+@app.route("/anuncios", methods=["GET","POST"])
+@login_required
+def anuncios():
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Somente o proprietário pode gerenciar anúncios.")
+        return redirect("/")
+
+    con = db()
+    erro = ""
+    sucesso = ""
+
+    if request.method == "POST":
+        titulo = request.form.get("titulo", "").strip()
+        mensagem = request.form.get("mensagem", "").strip()
+
+        if not titulo or not mensagem:
+            erro = "Preencha o título e a mensagem."
+        else:
+            con.cursor().execute(
+                """INSERT INTO avisos
+                   (academia_id,titulo,mensagem,criado_em)
+                   VALUES(%s,%s,%s,%s)""",
+                (aid(), titulo, mensagem, agora())
+            )
+            con.commit()
+            sucesso = "Anúncio publicado com sucesso."
+
+    rows = con.cursor().execute(
+        """SELECT *
+           FROM avisos
+           WHERE academia_id=%s
+           ORDER BY id DESC""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    return page("Anúncios", """
+    <h1>📢 Anúncios da Academia</h1>
+
+    <p class="muted">
+      Publique comunicados para os usuários desta academia.
+      Disponível em todos os planos TatameOne.
+    </p>
+
+    {% if erro %}
+    <div class="card" style="color:#dc2626;margin-bottom:18px">
+      {{erro}}
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="card" style="color:#16a34a;margin-bottom:18px">
+      {{sucesso}}
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:22px">
+      <h2>➕ Novo anúncio</h2>
+
+      <form method="post">
+        <label>Título</label>
+        <input name="titulo"
+               maxlength="150"
+               required
+               placeholder="Ex.: Academia fechada no feriado">
+
+        <label>Mensagem</label>
+        <textarea name="mensagem"
+                  rows="6"
+                  required
+                  placeholder="Digite o comunicado..."></textarea>
+
+        <button class="green"
+                style="width:100%;font-size:24px;
+                       min-height:62px;font-weight:800">
+          📢 Publicar anúncio
+        </button>
+      </form>
+    </div>
+
+    <h2>📋 Anúncios publicados</h2>
+
+    {% for a in rows %}
+    <div class="card" style="margin-bottom:14px">
+      <h2>{{a.titulo}}</h2>
+
+      <div style="font-size:19px;white-space:pre-wrap">
+        {{a.mensagem}}
+      </div>
+
+      <p class="muted">{{a.criado_em}}</p>
+
+      <a class="btn danger"
+         href="/anuncios/{{a.id}}/excluir"
+         onclick="return confirm('Excluir este anúncio?')">
+        🗑️ Excluir
+      </a>
+    </div>
+    {% else %}
+    <div class="card">
+      Nenhum anúncio publicado.
+    </div>
+    {% endfor %}
+    """, rows=rows, erro=erro, sucesso=sucesso)
+
+
+@app.route("/anuncios/<int:id>/excluir")
+@login_required
+def excluir_anuncio(id):
+    if str(session.get("perfil") or "").upper() != "DONO":
+        return redirect("/")
+
+    con = db()
+
+    con.cursor().execute(
+        """DELETE FROM avisos
+           WHERE id=%s
+             AND academia_id=%s""",
+        (id, aid())
+    )
+
+    con.commit()
+    con.close()
+
+    flash("Anúncio excluído.")
+    return redirect("/anuncios")
+
 
 @app.route("/alunos")
 @login_required
