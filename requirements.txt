@@ -2,3 +2,4 @@ Flask
 gunicorn
 psycopg[binary]
 qrcode[pil]
+reportlab==5.0.1

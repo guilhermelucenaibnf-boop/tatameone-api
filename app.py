@@ -8,6 +8,14 @@ import base64
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, flash, send_from_directory
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from flask import send_file
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tatameone-2-troque-em-producao")
@@ -1770,7 +1778,13 @@ def alunos():
     con.close()
     link_publico=request.url_root.rstrip("/")+"/cadastro/"+str(aid())
     return page("Alunos","""
-    <div class="actions"><h1 style="flex:1">Alunos</h1><a class="btn green" href="/alunos/novo">+ Novo aluno</a></div>
+    <div class="actions">
+<h1 style="flex:1">Alunos</h1>
+{% if session.get('perfil','')|upper == 'DONO' %}
+<a class="btn" href="/alunos/pdf">📄 PDF de Alunos</a>
+{% endif %}
+<a class="btn green" href="/alunos/novo">+ Novo aluno</a>
+</div>
     <div class="card" style="margin:12px 0 18px">
       <h2>🔗 Cadastro do aluno em casa</h2>
       <p class="muted">O aluno pode preencher pelo navegador, sem instalar o aplicativo.</p>
@@ -1801,6 +1815,175 @@ def alunos():
     <td><a class="btn" href="/alunos/{{x.id}}">Abrir</a></td>
     </tr>{% endfor %}
     </table></div>""",rows=rows,pendentes=pendentes,link_publico=link_publico)
+
+
+@app.route("/alunos/pdf")
+@login_required
+@permissao_required("alunos")
+def alunos_pdf():
+    if str(session.get("perfil") or "").upper() != "DONO":
+        flash("Somente o proprietário pode gerar o relatório de alunos.")
+        return redirect("/alunos")
+
+    con = db()
+
+    academia = con.cursor().execute(
+        "SELECT id,nome,documento,telefone,endereco,logo FROM academias WHERE id=%s",
+        (aid(),)
+    ).fetchone()
+
+    alunos_lista = con.cursor().execute(
+        """SELECT nome,modalidade,telefone,ativo
+           FROM alunos
+           WHERE academia_id=%s
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    con.close()
+
+    total = len(alunos_lista)
+    ativos = sum(1 for x in alunos_lista if x["ativo"])
+    inativos = total - ativos
+
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=15*mm
+    )
+
+    styles = getSampleStyleSheet()
+
+    titulo = ParagraphStyle(
+        "TituloTatameOne",
+        parent=styles["Heading1"],
+        alignment=TA_CENTER,
+        fontSize=18,
+        leading=22,
+        spaceAfter=5*mm
+    )
+
+    centro = ParagraphStyle(
+        "CentroTatameOne",
+        parent=styles["Normal"],
+        alignment=TA_CENTER,
+        fontSize=10,
+        leading=14
+    )
+
+    elementos = []
+
+    if academia and academia.get("logo"):
+        logo_path = os.path.join("static", "logos", academia["logo"])
+        if os.path.isfile(logo_path):
+            try:
+                img = Image(logo_path)
+                img._restrictSize(35*mm, 22*mm)
+                img.hAlign = "CENTER"
+                elementos.append(img)
+                elementos.append(Spacer(1, 3*mm))
+            except Exception:
+                pass
+
+    nome_academia = academia["nome"] if academia else "Academia"
+
+    elementos.append(Paragraph(nome_academia, titulo))
+    elementos.append(Paragraph("<b>RELATÓRIO DE ALUNOS</b>", centro))
+    elementos.append(Spacer(1, 3*mm))
+    elementos.append(
+        Paragraph(
+            "Emitido em: " + datetime.now().strftime("%d/%m/%Y %H:%M"),
+            centro
+        )
+    )
+    elementos.append(Spacer(1, 6*mm))
+
+    resumo = [
+        ["TOTAL DE ALUNOS", "ATIVOS", "INATIVOS"],
+        [str(total), str(ativos), str(inativos)]
+    ]
+
+    tabela_resumo = Table(
+        resumo,
+        colWidths=[55*mm, 55*mm, 55*mm]
+    )
+
+    tabela_resumo.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#111827")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTNAME", (0,1), (-1,1), "Helvetica-Bold"),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("FONTSIZE", (0,0), (-1,-1), 10),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("TOPPADDING", (0,0), (-1,-1), 7),
+    ]))
+
+    elementos.append(tabela_resumo)
+    elementos.append(Spacer(1, 7*mm))
+
+    dados = [["Nº", "Aluno", "Modalidade", "Telefone", "Status"]]
+
+    for numero, aluno in enumerate(alunos_lista, 1):
+        dados.append([
+            str(numero),
+            str(aluno["nome"] or "-"),
+            str(aluno["modalidade"] or "-"),
+            str(aluno["telefone"] or "-"),
+            "ATIVO" if aluno["ativo"] else "INATIVO"
+        ])
+
+    if not alunos_lista:
+        dados.append(["-", "Nenhum aluno cadastrado", "-", "-", "-"])
+
+    tabela = Table(
+        dados,
+        repeatRows=1,
+        colWidths=[10*mm, 58*mm, 40*mm, 40*mm, 27*mm]
+    )
+
+    tabela.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#111827")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTNAME", (0,1), (-1,-1), "Helvetica"),
+        ("FONTSIZE", (0,0), (-1,-1), 8),
+        ("ALIGN", (0,0), (0,-1), "CENTER"),
+        ("ALIGN", (-1,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("GRID", (0,0), (-1,-1), 0.35, colors.grey),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1),
+         [colors.white, colors.HexColor("#f3f4f6")]),
+        ("TOPPADDING", (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+    ]))
+
+    elementos.append(tabela)
+    elementos.append(Spacer(1, 7*mm))
+    elementos.append(
+        Paragraph(
+            "Documento gerado pelo sistema TatameOne.",
+            centro
+        )
+    )
+
+    doc.build(elementos)
+
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="relatorio_alunos.pdf"
+    )
+
 
 @app.route("/cadastro/<int:academia_id>", methods=["GET","POST"])
 def cadastro_publico(academia_id):
