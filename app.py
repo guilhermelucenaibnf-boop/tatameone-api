@@ -1995,29 +1995,79 @@ def cadastro_publico(academia_id):
     mods=con.cursor().execute("SELECT nome FROM modalidades WHERE academia_id=%s AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
     if request.method=="POST":
         f=request.form
+        documento=(f.get("documento") or "").strip()
+
+        # Impede o mesmo CPF/Documento de ser cadastrado
+        # mais de uma vez na mesma academia.
+        if documento:
+            existente=con.cursor().execute(
+                """SELECT id FROM alunos
+                   WHERE academia_id=%s
+                     AND LOWER(TRIM(COALESCE(documento,'')))=LOWER(TRIM(%s))
+                   LIMIT 1""",
+                (academia_id,documento)
+            ).fetchone()
+
+            if existente:
+                con.close()
+                return public_page("Aluno já cadastrado","""
+                <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+                  <div style="font-size:70px">⚠️</div>
+                  <h1>Aluno já cadastrado</h1>
+                  <p>Já existe um aluno com este CPF/Documento em <b>{{nome}}</b>.</p>
+                  <div class="ok">Não foi criado um cadastro duplicado.</div>
+                </div>""",ac,nome=ac["nome"])
+
         foto_nome=None
         foto=request.files.get("foto_camera")
         if not foto or not foto.filename:
             foto=request.files.get("foto")
+
         if foto and foto.filename:
             ext=os.path.splitext(foto.filename)[1].lower()
             if ext in (".jpg",".jpeg",".png",".webp"):
                 os.makedirs("static/alunos",exist_ok=True)
                 foto_nome=secrets.token_hex(12)+ext
                 foto.save(os.path.join("static/alunos",foto_nome))
-        con.cursor().execute("""INSERT INTO pre_cadastros(
-        academia_id,nome,documento,nascimento,telefone,email,responsavel,telefone_responsavel,
-        modalidade,graduacao,observacoes,status,criado_em,endereco,contato_emergencia,telefone_emergencia,foto)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDENTE',%s,%s,%s,%s,%s)""",
-        (academia_id,f["nome"],f.get("documento"),f.get("nascimento"),f.get("telefone"),f.get("email"),
-         f.get("responsavel"),f.get("telefone_responsavel"),f.get("modalidade"),f.get("graduacao"),
-         f.get("observacoes"),agora(),f.get("endereco"),f.get("contato_emergencia"),f.get("telefone_emergencia"),foto_nome))
-        con.commit();con.close()
-        return public_page("Cadastro enviado","""
+
+        con.cursor().execute("""INSERT INTO alunos(
+            academia_id,nome,documento,nascimento,telefone,email,
+            responsavel,telefone_responsavel,modalidade,graduacao,
+            observacoes,qr_token,criado_em,endereco,
+            contato_emergencia,telefone_emergencia,foto,ativo)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)""",
+            (
+                academia_id,
+                f["nome"],
+                documento or None,
+                f.get("nascimento"),
+                f.get("telefone"),
+                f.get("email"),
+                f.get("responsavel"),
+                f.get("telefone_responsavel"),
+                f.get("modalidade"),
+                f.get("graduacao"),
+                f.get("observacoes"),
+                secrets.token_hex(8),
+                agora(),
+                f.get("endereco"),
+                f.get("contato_emergencia"),
+                f.get("telefone_emergencia"),
+                foto_nome
+            )
+        )
+
+        con.commit()
+        con.close()
+
+        return public_page("Cadastro concluído","""
         <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
-        <div style="font-size:70px">✅</div><h1>Cadastro enviado com sucesso!</h1>
-        <p>Seus dados foram enviados para <b>{{nome}}</b>.</p>
-        <div class="ok">Aguarde a análise da academia. Não é necessário instalar o aplicativo.</div></div>""",ac,nome=ac["nome"])
+          <div style="font-size:70px">✅</div>
+          <h1>Cadastro realizado com sucesso!</h1>
+          <p>Seu cadastro em <b>{{nome}}</b> foi concluído.</p>
+          <div class="ok">Você já está cadastrado como aluno da academia.</div>
+        </div>""",ac,nome=ac["nome"])
+
     con.close()
     return public_page("Cadastro de aluno","""
     <div class="card"><h1>Cadastro de aluno</h1>
