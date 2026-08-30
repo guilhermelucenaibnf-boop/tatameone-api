@@ -4348,14 +4348,41 @@ def professor_status(id):
 @login_required
 @permissao_required("aulas")
 def aulas():
-    con=db()
+    con = db()
     erro = ""
 
-    if request.method=="POST":
-        f=request.form
+    if request.method == "POST":
+        f = request.form
 
         modalidade = f.get("modalidade","").strip()
         professor = f.get("professor","").strip()
+        semana = f.get("semana","TODAS").strip().upper()
+
+        if semana not in ("TODAS","A","B"):
+            semana = "TODAS"
+
+        ordem_dias = [
+            "Segunda","Terça","Quarta","Quinta",
+            "Sexta","Sábado","Domingo"
+        ]
+
+        dias = [
+            d for d in ordem_dias
+            if d in request.form.getlist("dias")
+        ]
+
+        horarios_entrada = request.form.getlist("horarios")
+
+        horarios = []
+        for h in horarios_entrada:
+            h = h.strip()
+            if h and h not in horarios:
+                horarios.append(h)
+
+        try:
+            capacidade = int(f.get("capacidade") or 20)
+        except (ValueError, TypeError):
+            capacidade = 20
 
         professor_valido = True
 
@@ -4364,8 +4391,8 @@ def aulas():
                 """SELECT especialidade
                    FROM professores
                    WHERE academia_id=%s
-                   AND nome=%s
-                   AND ativo=1""",
+                     AND nome=%s
+                     AND ativo=1""",
                 (aid(),professor)
             ).fetchone()
 
@@ -4377,28 +4404,37 @@ def aulas():
                     for x in str(prof["especialidade"] or "").split(",")
                     if x.strip()
                 ]
-
                 if modalidade not in especialidades:
                     professor_valido = False
 
-        if not professor_valido:
+        if not modalidade:
+            erro = "Selecione a modalidade."
+        elif not professor_valido:
             erro = "Este professor não possui a especialidade da modalidade selecionada."
+        elif not dias:
+            erro = "Selecione pelo menos um dia."
+        elif not horarios:
+            erro = "Informe pelo menos um horário."
+        elif capacidade < 1:
+            erro = "A capacidade deve ser de pelo menos 1 aluno."
         else:
+            dias_texto = " / ".join(dias)
+            horarios_texto = " / ".join(horarios)
+
             con.cursor().execute(
                 """INSERT INTO aulas
-                   (academia_id,modalidade,professor,dia,horario,capacidade)
-                   VALUES(%s,%s,%s,%s,%s,%s)""",
+                   (academia_id,modalidade,professor,dia,
+                    horario,capacidade,semana)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s)""",
                 (
-                    aid(),
-                    modalidade,
-                    professor,
-                    f.get("dia"),
-                    f.get("horario"),
-                    int(f.get("capacidade") or 20)
+                    aid(), modalidade, professor,
+                    dias_texto, horarios_texto,
+                    capacidade, semana
                 )
             )
             con.commit()
-    rows=con.cursor().execute(
+
+    rows = con.cursor().execute(
         """SELECT a.*,
                   (
                     SELECT COUNT(*)
@@ -4421,149 +4457,208 @@ def aulas():
                   ) AS vagas_disponiveis
            FROM aulas a
            WHERE a.academia_id=%s
-           ORDER BY a.ativo DESC,a.dia,a.horario""",
+           ORDER BY a.ativo DESC,a.id DESC""",
         (aid(),)
     ).fetchall()
-    mods=con.cursor().execute("SELECT * FROM modalidades WHERE academia_id=%s ORDER BY nome",(aid(),)).fetchall()
-    professores=con.cursor().execute(
+
+    mods = con.cursor().execute(
+        """SELECT *
+           FROM modalidades
+           WHERE academia_id=%s
+           ORDER BY nome""",
+        (aid(),)
+    ).fetchall()
+
+    professores = con.cursor().execute(
         """SELECT id,nome,especialidade
            FROM professores
            WHERE academia_id=%s AND ativo=1
            ORDER BY nome""",
         (aid(),)
     ).fetchall()
+
     con.close()
+
     return page("Aulas","""
-    <h1>Agenda de aulas</h1>
+    <h1>📅 Agenda de aulas</h1>
 
     {% if erro %}
-    <div class="card"
-         style="color:#dc2626;margin-bottom:18px">
+    <div class="card" style="color:#dc2626;margin-bottom:18px">
       {{erro}}
     </div>
     {% endif %}
 
-    <div class="grid"><div class="card"><form method="post"><label>Modalidade</label>
-    <select name="modalidade"
-            id="modalidade_aula"
-            required
-            onchange="filtrarProfessores()">
-      <option value="">Selecione</option>
-      {% for m in mods %}
-      <option value="{{m.nome}}">{{m.nome}}</option>
-      {% endfor %}
-    </select>
+    <div class="grid">
+      <div class="card">
+        <form method="post">
 
-    <label>Professor</label>
+          <label>Modalidade</label>
+          <select name="modalidade"
+                  id="modalidade_aula"
+                  required
+                  onchange="filtrarProfessores()">
+            <option value="">Selecione</option>
+            {% for m in mods %}
+            <option value="{{m.nome}}">{{m.nome}}</option>
+            {% endfor %}
+          </select>
 
-    <select name="professor"
-            id="professor_aula"
-            disabled>
+          <label>Professor</label>
+          <select name="professor"
+                  id="professor_aula"
+                  disabled>
+            <option value="">Primeiro selecione a modalidade</option>
+            {% for p in professores %}
+            <option value="{{p.nome}}"
+                    data-especialidades="{{p.especialidade or ''}}"
+                    hidden>
+              {{p.nome}}
+            </option>
+            {% endfor %}
+          </select>
 
-      <option value="">
-        Primeiro selecione a modalidade
-      </option>
+          <p id="aviso_professor"
+             class="muted"
+             style="margin-top:-10px;margin-bottom:20px">
+            Selecione uma modalidade para visualizar os professores habilitados.
+          </p>
 
-      {% for p in professores %}
-      <option value="{{p.nome}}"
-              data-especialidades="{{p.especialidade or ''}}"
-              hidden>
-        {{p.nome}}
-      </option>
-      {% endfor %}
-
-    </select>
-
-    <p id="aviso_professor"
-       class="muted"
-       style="margin-top:-10px;margin-bottom:20px">
-      Selecione uma modalidade para visualizar os professores habilitados.
-    </p>
-
-    <a class="btn light"
-       href="/professores"
-       style="display:flex;align-items:center;justify-content:center;width:100%;margin-bottom:22px">
-       👨‍🏫 Gerenciar professores
-    </a>
-
-    <label>Dia</label><select name="dia"><option>Segunda</option><option>Terça</option><option>Quarta</option><option>Quinta</option><option>Sexta</option><option>Sábado</option><option>Domingo</option></select>
-    <label>Horário</label><input type="time" name="horario"><label>Capacidade</label><input type="number" name="capacidade" value="20">
-    <button class="green">Cadastrar aula</button></form></div><div class="card">
-    {% for x in rows %}
-      <div style="padding:14px 0;border-bottom:1px solid #ddd">
-        <p style="margin:0 0 10px 0">
-          <b>{{x.modalidade}}</b> · {{x.dia}} {{x.horario}}<br>
-          {{x.professor or 'Professor não definido'}}<br>
-          👥 {{x.alunos_modalidade}} aluno{% if x.alunos_modalidade != 1 %}s{% endif %} ·
-          {{x.vagas_disponiveis}} de {{x.capacidade}} vagas disponíveis
-        </p>
-
-        <div style="margin-top:14px">
-          {% if x.ativo %}
-            <span class="pill">ATIVA</span>
-          {% else %}
-            <span class="pill">INATIVA</span>
-          {% endif %}
-        </div>
-
-        <div class="actions" style="margin-top:18px">
-
-          <a class="btn"
-             href="/aulas/{{x.id}}/editar">
-            ✏️ Editar
+          <a class="btn light"
+             href="/professores"
+             style="display:flex;align-items:center;justify-content:center;width:100%;margin-bottom:22px">
+            👨‍🏫 Gerenciar professores
           </a>
 
-          <form method="post"
-                action="/aulas/{{x.id}}/status"
-                style="margin:0">
+          <label>Semana</label>
+          <select name="semana">
+            <option value="TODAS">Todas as semanas</option>
+            <option value="A">Semana A</option>
+            <option value="B">Semana B</option>
+          </select>
 
-            {% if x.ativo %}
-            <button type="submit"
-                    class="danger">
-              ⏸️ Desativar
-            </button>
-            {% else %}
-            <button type="submit"
-                    class="green">
-              ▶️ Ativar
-            </button>
-            {% endif %}
+          <label>Dias da semana</label>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 22px">
+            {% for d in ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"] %}
+            <label style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd;border-radius:10px;margin:0">
+              <input type="checkbox"
+                     name="dias"
+                     value="{{d}}"
+                     style="width:auto;margin:0">
+              {{d}}
+            </label>
+            {% endfor %}
+          </div>
 
-          </form>
+          <label>Horários</label>
 
-          <form method="post"
-                action="/aulas/{{x.id}}/excluir"
-                style="margin:0"
-                onsubmit="return confirm('Excluir esta aula definitivamente?');">
-            <button type="submit" class="danger">
-              🗑️ Excluir
-            </button>
-          </form>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <input type="time" name="horarios">
+            <input type="time" name="horarios">
+            <input type="time" name="horarios">
+          </div>
 
-        </div>
+          <p class="muted" style="margin-top:8px;margin-bottom:18px">
+            Informe até 3 horários para esta programação.
+          </p>
+
+          <label>Capacidade por aula</label>
+          <input type="number"
+                 name="capacidade"
+                 min="1"
+                 value="20">
+
+          <button class="green" style="width:100%">
+            ➕ Cadastrar programação
+          </button>
+
+        </form>
       </div>
-    {% else %}
-      <p class="muted">Nenhuma aula cadastrada.</p>
-    {% endfor %}
-    </div></div>
+
+      <div class="card">
+
+        {% for x in rows %}
+        <div style="padding:16px 0;border-bottom:1px solid #ddd">
+
+          <p style="margin:0 0 12px 0;line-height:1.7">
+            <b style="font-size:18px">{{x.modalidade}}</b><br>
+
+            📅
+            {% if (x.semana or 'TODAS') == 'A' %}
+              <b>Semana A</b>
+            {% elif (x.semana or 'TODAS') == 'B' %}
+              <b>Semana B</b>
+            {% else %}
+              <b>Todas as semanas</b>
+            {% endif %}
+            <br>
+
+            📆 <b>{{x.dia.replace(' / ', ' e ')}}</b><br>
+            🕐 <b>{{x.horario}}</b><br>
+
+            👨‍🏫 {{x.professor or 'Professor não definido'}}<br>
+
+            👥 {{x.alunos_modalidade}}
+            aluno{% if x.alunos_modalidade != 1 %}s{% endif %}
+            · {{x.vagas_disponiveis}} de
+            {{x.capacidade}} vagas disponíveis
+          </p>
+
+          {% if x.ativo %}
+          <span class="pill">ATIVA</span>
+          {% else %}
+          <span class="pill">INATIVA</span>
+          {% endif %}
+
+          <div class="actions" style="margin-top:18px">
+
+            <a class="btn" href="/aulas/{{x.id}}/editar">
+              ✏️ Editar programação
+            </a>
+
+            <form method="post"
+                  action="/aulas/{{x.id}}/status"
+                  style="margin:0">
+              {% if x.ativo %}
+              <button type="submit" class="danger">⏸️ Desativar</button>
+              {% else %}
+              <button type="submit" class="green">▶️ Ativar</button>
+              {% endif %}
+            </form>
+
+            <form method="post"
+                  action="/aulas/{{x.id}}/excluir"
+                  style="margin:0"
+                  onsubmit="return confirm('Excluir esta programação?');">
+              <button type="submit" class="danger">🗑️ Excluir</button>
+            </form>
+
+          </div>
+        </div>
+
+        {% else %}
+        <p class="muted">Nenhuma aula cadastrada.</p>
+        {% endfor %}
+
+      </div>
+    </div>
 
     <script>
     function filtrarProfessores() {
-        const modalidade = document.getElementById("modalidade_aula").value;
-        const select = document.getElementById("professor_aula");
-        const aviso = document.getElementById("aviso_professor");
+        const modalidade =
+            document.getElementById("modalidade_aula").value;
+        const select =
+            document.getElementById("professor_aula");
+        const aviso =
+            document.getElementById("aviso_professor");
 
         select.value = "";
-
         let encontrados = 0;
 
-        Array.from(select.options).forEach((option, index) => {
+        Array.from(select.options).forEach((option,index) => {
+            if (index === 0) return;
 
-            if (index === 0) {
-                return;
-            }
-
-            const especialidades = (option.dataset.especialidades || "")
+            const especialidades =
+                (option.dataset.especialidades || "")
                 .split(",")
                 .map(x => x.trim())
                 .filter(Boolean);
@@ -4575,32 +4670,25 @@ def aulas():
             option.hidden = !mostrar;
             option.disabled = !mostrar;
 
-            if (mostrar) {
-                encontrados++;
-            }
+            if (mostrar) encontrados++;
         });
 
         if (!modalidade) {
             select.disabled = true;
             select.options[0].text =
                 "Primeiro selecione a modalidade";
-
             aviso.textContent =
                 "Selecione uma modalidade para visualizar os professores habilitados.";
-
         } else if (encontrados === 0) {
             select.disabled = true;
             select.options[0].text =
                 "Nenhum professor habilitado";
-
             aviso.textContent =
                 "Nenhum professor ativo possui esta especialidade.";
-
         } else {
             select.disabled = false;
             select.options[0].text =
                 "Professor não definido";
-
             aviso.textContent =
                 encontrados === 1
                 ? "1 professor habilitado para esta modalidade."
@@ -4660,8 +4748,26 @@ def aula_editar(id):
 
         modalidade = f.get("modalidade","").strip()
         professor = f.get("professor","").strip()
-        dia = f.get("dia","").strip()
-        horario = f.get("horario","").strip()
+        semana = f.get("semana","TODAS").strip().upper()
+
+        if semana not in ("TODAS","A","B"):
+            semana = "TODAS"
+
+        ordem_dias = [
+            "Segunda","Terça","Quarta","Quinta",
+            "Sexta","Sábado","Domingo"
+        ]
+
+        dias = [
+            d for d in ordem_dias
+            if d in request.form.getlist("dias")
+        ]
+
+        horarios = []
+        for h in request.form.getlist("horarios"):
+            h = h.strip()
+            if h and h not in horarios:
+                horarios.append(h)
 
         try:
             capacidade = int(f.get("capacidade") or 20)
@@ -4675,8 +4781,8 @@ def aula_editar(id):
                 """SELECT especialidade
                    FROM professores
                    WHERE academia_id=%s
-                   AND nome=%s
-                   AND ativo=1""",
+                     AND nome=%s
+                     AND ativo=1""",
                 (aid(),professor)
             ).fetchone()
 
@@ -4688,34 +4794,35 @@ def aula_editar(id):
                     for x in str(prof["especialidade"] or "").split(",")
                     if x.strip()
                 ]
-
                 if modalidade not in especialidades:
                     professor_valido = False
 
         if not modalidade:
             erro = "Selecione a modalidade."
-
         elif not professor_valido:
             erro = "Este professor não possui a especialidade da modalidade selecionada."
-
+        elif not dias:
+            erro = "Selecione pelo menos um dia."
+        elif not horarios:
+            erro = "Informe pelo menos um horário."
         elif capacidade < 1:
             erro = "A capacidade deve ser de pelo menos 1 aluno."
-
         else:
             con.cursor().execute(
                 """UPDATE aulas
                    SET modalidade=%s,
                        professor=%s,
+                       semana=%s,
                        dia=%s,
                        horario=%s,
                        capacidade=%s
-                   WHERE id=%s
-                   AND academia_id=%s""",
+                   WHERE id=%s AND academia_id=%s""",
                 (
                     modalidade,
                     professor,
-                    dia,
-                    horario,
+                    semana,
+                    " / ".join(dias),
+                    " / ".join(horarios),
                     capacidade,
                     id,
                     aid()
@@ -4724,13 +4831,27 @@ def aula_editar(id):
 
             con.commit()
             con.close()
-
             return redirect("/aulas")
+
+    dias_atuais = [
+        x.strip()
+        for x in str(aula["dia"] or "").split("/")
+        if x.strip()
+    ]
+
+    horarios_atuais = [
+        x.strip()
+        for x in str(aula["horario"] or "").split("/")
+        if x.strip()
+    ]
+
+    while len(horarios_atuais) < 3:
+        horarios_atuais.append("")
 
     con.close()
 
     return page("Editar aula","""
-    <h1>✏️ Editar aula</h1>
+    <h1>✏️ Editar programação</h1>
 
     {% if erro %}
     <div class="card"
@@ -4740,36 +4861,25 @@ def aula_editar(id):
     {% endif %}
 
     <div class="card">
-
       <form method="post">
 
         <label>Modalidade</label>
-
         <select name="modalidade"
                 id="modalidade_editar"
                 required
                 onchange="filtrarProfessoresEditar()">
-
-          <option value="">Selecione</option>
-
           {% for m in mods %}
           <option value="{{m.nome}}"
                   {% if m.nome == aula.modalidade %}selected{% endif %}>
             {{m.nome}}
           </option>
           {% endfor %}
-
         </select>
 
         <label>Professor</label>
-
         <select name="professor"
                 id="professor_editar">
-
-          <option value="">
-            Professor não definido
-          </option>
-
+          <option value="">Professor não definido</option>
           {% for p in professores %}
           <option value="{{p.nome}}"
                   data-especialidades="{{p.especialidade or ''}}"
@@ -4777,7 +4887,6 @@ def aula_editar(id):
             {{p.nome}}
           </option>
           {% endfor %}
-
         </select>
 
         <p id="aviso_professor_editar"
@@ -4785,55 +4894,77 @@ def aula_editar(id):
            style="margin-top:-10px;margin-bottom:20px">
         </p>
 
-        <label>Dia</label>
-
-        <select name="dia">
-          {% for d in ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"] %}
-          <option value="{{d}}"
-                  {% if d == aula.dia %}selected{% endif %}>
-            {{d}}
+        <label>Semana</label>
+        <select name="semana">
+          <option value="TODAS"
+                  {% if (aula.semana or 'TODAS') == 'TODAS' %}selected{% endif %}>
+            Todas as semanas
           </option>
-          {% endfor %}
+          <option value="A"
+                  {% if aula.semana == 'A' %}selected{% endif %}>
+            Semana A
+          </option>
+          <option value="B"
+                  {% if aula.semana == 'B' %}selected{% endif %}>
+            Semana B
+          </option>
         </select>
 
-        <label>Horário</label>
-        <input type="time"
-               name="horario"
-               value="{{aula.horario or ''}}">
+        <label>Dias da semana</label>
 
-        <label>Capacidade</label>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 22px">
+          {% for d in ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"] %}
+          <label style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd;border-radius:10px;margin:0">
+            <input type="checkbox"
+                   name="dias"
+                   value="{{d}}"
+                   {% if d in dias_atuais %}checked{% endif %}
+                   style="width:auto;margin:0">
+            {{d}}
+          </label>
+          {% endfor %}
+        </div>
+
+        <label>Horários</label>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <input type="time"
+                 name="horarios"
+                 value="{{horarios_atuais[0]}}">
+          <input type="time"
+                 name="horarios"
+                 value="{{horarios_atuais[1]}}">
+          <input type="time"
+                 name="horarios"
+                 value="{{horarios_atuais[2]}}">
+        </div>
+
+        <label style="margin-top:18px">Capacidade</label>
         <input type="number"
                name="capacidade"
                min="1"
                value="{{aula.capacidade or 20}}">
 
-        <button class="green"
-                style="width:100%">
-          💾 Salvar alterações
+        <button class="green" style="width:100%">
+          💾 Salvar programação
         </button>
 
       </form>
-
     </div>
 
     <script>
     function filtrarProfessoresEditar() {
         const modalidade =
             document.getElementById("modalidade_editar").value;
-
         const select =
             document.getElementById("professor_editar");
-
         const aviso =
             document.getElementById("aviso_professor_editar");
 
         let encontrados = 0;
 
-        Array.from(select.options).forEach((option, index) => {
-
-            if (index === 0) {
-                return;
-            }
+        Array.from(select.options).forEach((option,index) => {
+            if (index === 0) return;
 
             const especialidades =
                 (option.dataset.especialidades || "")
@@ -4848,32 +4979,13 @@ def aula_editar(id):
             option.hidden = !mostrar;
             option.disabled = !mostrar;
 
-            if (mostrar) {
-                encontrados++;
-            }
+            if (mostrar) encontrados++;
         });
 
-        if (!modalidade) {
-            select.disabled = true;
-
-            aviso.textContent =
-                "Selecione uma modalidade para visualizar os professores habilitados.";
-
-        } else if (encontrados === 0) {
-            select.disabled = true;
-            select.value = "";
-
-            aviso.textContent =
-                "Nenhum professor ativo possui esta especialidade.";
-
-        } else {
-            select.disabled = false;
-
-            aviso.textContent =
-                encontrados === 1
-                ? "1 professor habilitado para esta modalidade."
-                : encontrados + " professores habilitados para esta modalidade.";
-        }
+        aviso.textContent =
+            encontrados === 0
+            ? "Nenhum professor ativo possui esta especialidade."
+            : encontrados + " professor(es) habilitado(s).";
     }
 
     document.addEventListener(
@@ -4885,6 +4997,8 @@ def aula_editar(id):
     aula=aula,
     mods=mods,
     professores=professores,
+    dias_atuais=dias_atuais,
+    horarios_atuais=horarios_atuais,
     erro=erro)
 
 
