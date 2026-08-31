@@ -2036,11 +2036,12 @@ def cadastro_publico(academia_id):
     mods=con.cursor().execute("SELECT nome FROM modalidades WHERE academia_id=%s AND ativo=1 ORDER BY nome",(academia_id,)).fetchall()
     if request.method=="POST":
         f=request.form
+        acao=(f.get("acao") or "cadastrar").strip()
         documento=(f.get("documento") or "").strip()
 
         # Se o CPF/Documento já pertence a um aluno, permite
         # atualizar somente a foto mediante confirmação dos dados.
-        if documento:
+        if acao=="atualizar_foto" and documento:
             existente=con.cursor().execute(
                 """SELECT id,nascimento,telefone FROM alunos
                    WHERE academia_id=%s
@@ -2138,6 +2139,24 @@ def cadastro_publico(academia_id):
                   <div class="ok">Não foi criado um novo cadastro.</div>
                 </div>""",ac,nome=ac["nome"])
 
+            con.close()
+            return public_page("Cadastro não encontrado","""
+            <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+              <div style="font-size:70px">🔎</div>
+              <h1>Cadastro não encontrado</h1>
+              <p>Não encontramos um aluno com esse CPF/Documento nesta academia.</p>
+              <div class="ok">Nenhum dado foi alterado.</div>
+            </div>""",ac)
+
+        if acao=="atualizar_foto":
+            con.close()
+            return public_page("Documento necessário","""
+            <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+              <div style="font-size:70px">⚠️</div>
+              <h1>Informe seu CPF/Documento</h1>
+              <p>O CPF/Documento é necessário para localizar seu cadastro.</p>
+            </div>""",ac)
+
         foto_nome=None
         foto_dados=None
         foto_tipo=None
@@ -2200,9 +2219,55 @@ def cadastro_publico(academia_id):
 
     con.close()
     return public_page("Cadastro de aluno","""
-    <div class="card"><h1>Cadastro de aluno</h1>
+    <div class="card">
+    <h1>📷 Já sou aluno</h1>
+    <p class="muted">Se você já está cadastrado, use esta opção somente para colocar ou atualizar sua foto.</p>
+
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="acao" value="atualizar_foto">
+
+      <label>CPF/Documento *</label>
+      <input name="documento" required>
+
+      <div class="grid">
+        <div>
+          <label>Data de nascimento</label>
+          <input type="date" name="nascimento">
+        </div>
+        <div>
+          <label>Telefone</label>
+          <input name="telefone">
+        </div>
+      </div>
+
+      <p class="muted">Informe a data de nascimento ou o telefone que consta no seu cadastro.</p>
+
+      <label>📷 Nova foto *</label>
+      <div class="grid">
+        <div>
+          <label>📸 Tirar foto</label>
+          <input type="file"
+                 name="foto_camera"
+                 accept="image/*"
+                 capture="environment">
+        </div>
+        <div>
+          <label>🖼️ Escolher da galeria</label>
+          <input type="file"
+                 name="foto"
+                 accept="image/jpeg,image/png,image/webp">
+        </div>
+      </div>
+
+      <button type="submit">📷 Atualizar minha foto</button>
+    </form>
+    </div>
+
+    <div class="card">
+    <h1>🆕 Novo aluno — Fazer cadastro</h1>
     <p class="muted">Preencha seus dados. Não é necessário instalar o aplicativo.</p>
     <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="acao" value="cadastrar">
     <label>📷 Foto do aluno</label>
 <div class="grid">
   <div>
