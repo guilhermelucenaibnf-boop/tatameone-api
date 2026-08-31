@@ -2038,11 +2038,11 @@ def cadastro_publico(academia_id):
         f=request.form
         documento=(f.get("documento") or "").strip()
 
-        # Impede o mesmo CPF/Documento de ser cadastrado
-        # mais de uma vez na mesma academia.
+        # Se o CPF/Documento já pertence a um aluno, permite
+        # atualizar somente a foto mediante confirmação dos dados.
         if documento:
             existente=con.cursor().execute(
-                """SELECT id FROM alunos
+                """SELECT id,nascimento,telefone FROM alunos
                    WHERE academia_id=%s
                      AND LOWER(TRIM(COALESCE(documento,'')))=LOWER(TRIM(%s))
                    LIMIT 1""",
@@ -2050,13 +2050,92 @@ def cadastro_publico(academia_id):
             ).fetchone()
 
             if existente:
+                nascimento_informado=(f.get("nascimento") or "").strip()
+                telefone_informado="".join(
+                    c for c in (f.get("telefone") or "") if c.isdigit()
+                )
+                nascimento_salvo=(existente["nascimento"] or "").strip()
+                telefone_salvo="".join(
+                    c for c in (existente["telefone"] or "") if c.isdigit()
+                )
+
+                nascimento_ok=bool(
+                    nascimento_salvo
+                    and nascimento_informado
+                    and nascimento_salvo == nascimento_informado
+                )
+                telefone_ok=bool(
+                    telefone_salvo
+                    and telefone_informado
+                    and telefone_salvo == telefone_informado
+                )
+
+                if not (nascimento_ok or telefone_ok):
+                    con.close()
+                    return public_page("Confirmação necessária","""
+                    <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+                      <div style="font-size:70px">🔒</div>
+                      <h1>Não foi possível confirmar o cadastro</h1>
+                      <p>O CPF/Documento já está cadastrado, mas a data de nascimento ou o telefone informado não corresponde ao cadastro existente.</p>
+                      <div class="ok">Nenhum dado foi alterado.</div>
+                    </div>""",ac)
+
+                foto=request.files.get("foto_camera")
+                if not foto or not foto.filename:
+                    foto=request.files.get("foto")
+
+                if not foto or not foto.filename:
+                    con.close()
+                    return public_page("Foto necessária","""
+                    <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+                      <div style="font-size:70px">📷</div>
+                      <h1>Envie uma nova foto</h1>
+                      <p>Seu cadastro foi localizado. Volte ao formulário e tire uma foto ou escolha uma imagem da galeria.</p>
+                      <div class="ok">Nenhum cadastro duplicado foi criado.</div>
+                    </div>""",ac)
+
+                ext=os.path.splitext(foto.filename)[1].lower()
+                tipos={
+                    ".jpg":"image/jpeg",
+                    ".jpeg":"image/jpeg",
+                    ".png":"image/png",
+                    ".webp":"image/webp"
+                }
+
+                if ext not in tipos:
+                    con.close()
+                    return public_page("Foto inválida","""
+                    <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+                      <div style="font-size:70px">⚠️</div>
+                      <h1>Formato de foto não permitido</h1>
+                      <p>Utilize uma imagem JPG, JPEG, PNG ou WEBP.</p>
+                    </div>""",ac)
+
+                foto_nome=secrets.token_hex(12)+ext
+                foto_dados=foto.read()
+                foto_tipo=tipos[ext]
+
+                con.cursor().execute(
+                    """UPDATE alunos
+                       SET foto=%s, foto_dados=%s, foto_tipo=%s
+                       WHERE id=%s AND academia_id=%s""",
+                    (
+                        foto_nome,
+                        foto_dados,
+                        foto_tipo,
+                        existente["id"],
+                        academia_id
+                    )
+                )
+                con.commit()
                 con.close()
-                return public_page("Aluno já cadastrado","""
+
+                return public_page("Foto atualizada","""
                 <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
-                  <div style="font-size:70px">⚠️</div>
-                  <h1>Aluno já cadastrado</h1>
-                  <p>Já existe um aluno com este CPF/Documento em <b>{{nome}}</b>.</p>
-                  <div class="ok">Não foi criado um cadastro duplicado.</div>
+                  <div style="font-size:70px">✅</div>
+                  <h1>Foto atualizada com sucesso!</h1>
+                  <p>Seu cadastro em <b>{{nome}}</b> foi localizado e sua nova foto foi salva.</p>
+                  <div class="ok">Não foi criado um novo cadastro.</div>
                 </div>""",ac,nome=ac["nome"])
 
         foto_nome=None
