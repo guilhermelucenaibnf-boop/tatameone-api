@@ -7,7 +7,7 @@ import io
 import base64
 from datetime import datetime
 from functools import wraps
-from flask import Flask, request, redirect, url_for, session, render_template_string, flash, send_from_directory
+from flask import Flask, request, redirect, url_for, session, render_template_string, flash, send_from_directory, Response
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -72,6 +72,13 @@ def init_db():
 """CREATE TABLE IF NOT EXISTS pre_cadastros(id BIGSERIAL PRIMARY KEY,academia_id BIGINT NOT NULL,nome TEXT NOT NULL,documento TEXT,nascimento TEXT,telefone TEXT,email TEXT,responsavel TEXT,telefone_responsavel TEXT,modalidade TEXT,graduacao TEXT,observacoes TEXT,status TEXT DEFAULT 'PENDENTE',criado_em TEXT NOT NULL,endereco TEXT,contato_emergencia TEXT,telefone_emergencia TEXT,foto TEXT)"""
     ]
     for sql in comandos: cur.execute(sql)
+
+    # Fotos persistentes dos alunos no PostgreSQL.
+    # BYTEA evita depender do armazenamento temporário do Render.
+    cur.execute("ALTER TABLE alunos ADD COLUMN IF NOT EXISTS foto_dados BYTEA")
+    cur.execute("ALTER TABLE alunos ADD COLUMN IF NOT EXISTS foto_tipo TEXT")
+    cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS foto_dados BYTEA")
+    cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS foto_tipo TEXT")
 
     # Evolução internacional do módulo de avaliações físicas.
     # ADD COLUMN IF NOT EXISTS preserva avaliações já cadastradas.
@@ -1768,6 +1775,40 @@ def excluir_anuncio(id):
     return redirect("/anuncios")
 
 
+@app.route("/alunos/foto/<int:id>")
+@login_required
+def aluno_foto(id):
+    con=db()
+    aluno=con.cursor().execute(
+        """SELECT foto, foto_dados, foto_tipo
+           FROM alunos
+           WHERE id=%s AND academia_id=%s""",
+        (id,aid())
+    ).fetchone()
+    con.close()
+
+    if not aluno:
+        return Response(status=404)
+
+    if aluno["foto_dados"]:
+        return Response(
+            bytes(aluno["foto_dados"]),
+            mimetype=aluno["foto_tipo"] or "image/jpeg",
+            headers={"Cache-Control":"private, max-age=3600"}
+        )
+
+    # Compatibilidade temporaria com fotos antigas ainda existentes.
+    if aluno["foto"]:
+        caminho=os.path.join("static","alunos",aluno["foto"])
+        if os.path.isfile(caminho):
+            return send_from_directory(
+                os.path.join("static","alunos"),
+                aluno["foto"]
+            )
+
+    return Response(status=404)
+
+
 @app.route("/alunos")
 @login_required
 @permissao_required("alunos")
@@ -2019,23 +2060,31 @@ def cadastro_publico(academia_id):
                 </div>""",ac,nome=ac["nome"])
 
         foto_nome=None
+        foto_dados=None
+        foto_tipo=None
         foto=request.files.get("foto_camera")
         if not foto or not foto.filename:
             foto=request.files.get("foto")
 
         if foto and foto.filename:
             ext=os.path.splitext(foto.filename)[1].lower()
-            if ext in (".jpg",".jpeg",".png",".webp"):
-                os.makedirs("static/alunos",exist_ok=True)
+            tipos={
+                ".jpg":"image/jpeg",
+                ".jpeg":"image/jpeg",
+                ".png":"image/png",
+                ".webp":"image/webp"
+            }
+            if ext in tipos:
                 foto_nome=secrets.token_hex(12)+ext
-                foto.save(os.path.join("static/alunos",foto_nome))
+                foto_dados=foto.read()
+                foto_tipo=tipos[ext]
 
         con.cursor().execute("""INSERT INTO alunos(
             academia_id,nome,documento,nascimento,telefone,email,
             responsavel,telefone_responsavel,modalidade,graduacao,
             observacoes,qr_token,criado_em,endereco,
-            contato_emergencia,telefone_emergencia,foto,ativo)
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)""",
+            contato_emergencia,telefone_emergencia,foto,foto_dados,foto_tipo,ativo)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)""",
             (
                 academia_id,
                 f["nome"],
@@ -2053,7 +2102,9 @@ def cadastro_publico(academia_id):
                 f.get("endereco"),
                 f.get("contato_emergencia"),
                 f.get("telefone_emergencia"),
-                foto_nome
+                foto_nome,
+                foto_dados,
+                foto_tipo
             )
         )
 
@@ -2117,11 +2168,12 @@ def aprovar_pre_cadastro(id):
     if p:
         con.cursor().execute("""INSERT INTO alunos(academia_id,nome,documento,nascimento,telefone,email,responsavel,
         telefone_responsavel,modalidade,graduacao,observacoes,qr_token,criado_em,endereco,
-        contato_emergencia,telefone_emergencia,foto)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        contato_emergencia,telefone_emergencia,foto,foto_dados,foto_tipo)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (aid(),p["nome"],p["documento"],p["nascimento"],p["telefone"],p["email"],p["responsavel"],
          p["telefone_responsavel"],p["modalidade"],p["graduacao"],p["observacoes"],secrets.token_hex(8),agora(),
-         p["endereco"],p["contato_emergencia"],p["telefone_emergencia"],p["foto"]))
+         p["endereco"],p["contato_emergencia"],p["telefone_emergencia"],p["foto"],
+         p["foto_dados"],p["foto_tipo"]))
         con.cursor().execute("UPDATE pre_cadastros SET status='APROVADO' WHERE id=%s",(id,))
         con.commit()
     con.close()
@@ -2148,22 +2200,30 @@ def aluno_novo():
         f=request.form
 
         foto_nome=None
+        foto_dados=None
+        foto_tipo=None
         foto=request.files.get("foto_camera")
         if not foto or not foto.filename:
             foto=request.files.get("foto")
         if foto and foto.filename:
             ext=os.path.splitext(foto.filename)[1].lower()
-            if ext in (".jpg",".jpeg",".png",".webp"):
-                os.makedirs("static/alunos",exist_ok=True)
+            tipos={
+                ".jpg":"image/jpeg",
+                ".jpeg":"image/jpeg",
+                ".png":"image/png",
+                ".webp":"image/webp"
+            }
+            if ext in tipos:
                 foto_nome=secrets.token_hex(12)+ext
-                foto.save(os.path.join("static/alunos",foto_nome))
+                foto_dados=foto.read()
+                foto_tipo=tipos[ext]
 
         con.cursor().execute("""INSERT INTO alunos(
             academia_id,nome,documento,nascimento,telefone,email,
             responsavel,telefone_responsavel,modalidade,graduacao,
             observacoes,qr_token,criado_em,endereco,
-            contato_emergencia,telefone_emergencia,foto
-        ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            contato_emergencia,telefone_emergencia,foto,foto_dados,foto_tipo
+        ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (
             aid(),
             f["nome"],
@@ -2181,7 +2241,9 @@ def aluno_novo():
             f.get("endereco"),
             f.get("contato_emergencia"),
             f.get("telefone_emergencia"),
-            foto_nome
+            foto_nome,
+            foto_dados,
+            foto_tipo
         ))
 
         con.commit()
@@ -2398,7 +2460,7 @@ def aluno(id):
 
       {% if x.foto %}
       <div style="text-align:center;margin-bottom:20px">
-        <img src="/static/alunos/{{x.foto}}"
+        <img src="/alunos/foto/{{x.id}}"
              alt="Foto do aluno"
              style="width:150px;height:150px;
                     object-fit:cover;border-radius:18px;
