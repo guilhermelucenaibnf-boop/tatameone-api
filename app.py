@@ -75,6 +75,9 @@ def init_db():
 
     # Fotos persistentes dos alunos no PostgreSQL.
     # BYTEA evita depender do armazenamento temporário do Render.
+    # Tipo de documento: CPF, RG/Identidade ou CNH.
+    cur.execute("ALTER TABLE alunos ADD COLUMN IF NOT EXISTS tipo_documento TEXT DEFAULT 'CPF'")
+    cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS tipo_documento TEXT DEFAULT 'CPF'")
     cur.execute("ALTER TABLE alunos ADD COLUMN IF NOT EXISTS foto_dados BYTEA")
     cur.execute("ALTER TABLE alunos ADD COLUMN IF NOT EXISTS foto_tipo TEXT")
     cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS foto_dados BYTEA")
@@ -2038,16 +2041,20 @@ def cadastro_publico(academia_id):
         f=request.form
         acao=(f.get("acao") or "cadastrar").strip()
         documento=(f.get("documento") or "").strip()
+        tipo_documento=(f.get("tipo_documento") or "CPF").strip().upper()
+        if tipo_documento not in ("CPF","RG","CNH"):
+            tipo_documento="CPF"
 
-        # Se o CPF/Documento já pertence a um aluno, permite
+        # Se o documento já pertence a um aluno, permite
         # atualizar somente a foto mediante confirmação dos dados.
         if acao=="atualizar_foto" and documento:
             existente=con.cursor().execute(
                 """SELECT id,nascimento,telefone FROM alunos
                    WHERE academia_id=%s
                      AND LOWER(TRIM(COALESCE(documento,'')))=LOWER(TRIM(%s))
+                     AND UPPER(COALESCE(tipo_documento,'CPF'))=%s
                    LIMIT 1""",
-                (academia_id,documento)
+                (academia_id,documento,tipo_documento)
             ).fetchone()
 
             if existente:
@@ -2177,16 +2184,38 @@ def cadastro_publico(academia_id):
                 foto_dados=foto.read()
                 foto_tipo=tipos[ext]
 
+        # Bloqueio de duplicidade por tipo + numero na mesma academia.
+        if documento:
+            duplicado=con.cursor().execute(
+                """SELECT id FROM alunos
+                   WHERE academia_id=%s
+                     AND UPPER(COALESCE(tipo_documento,'CPF'))=%s
+                     AND LOWER(TRIM(COALESCE(documento,'')))=LOWER(TRIM(%s))
+                   LIMIT 1""",
+                (academia_id,tipo_documento,documento)
+            ).fetchone()
+            if duplicado:
+                con.close()
+                return public_page("Cadastro não realizado", f"""
+                <div class="card" style="max-width:620px;margin:7vh auto;text-align:center">
+                  <div style="font-size:70px">⚠️</div>
+                  <h1>Cadastro não realizado</h1>
+                  <p style="font-size:18px"><b>Já existe um aluno cadastrado com este {tipo_documento} nesta academia.</b></p>
+                  <div class="ok">Nenhum cadastro duplicado foi criado.</div>
+                  <br><a class="btn" href="/cadastro/{academia_id}">Voltar ao cadastro</a>
+                </div>""", ac)
+
         con.cursor().execute("""INSERT INTO alunos(
-            academia_id,nome,documento,nascimento,telefone,email,
+            academia_id,nome,documento,tipo_documento,nascimento,telefone,email,
             responsavel,telefone_responsavel,modalidade,graduacao,
             observacoes,qr_token,criado_em,endereco,
             contato_emergencia,telefone_emergencia,foto,foto_dados,foto_tipo,ativo)
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)""",
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)""",
             (
                 academia_id,
                 f["nome"],
                 documento or None,
+                tipo_documento,
                 f.get("nascimento"),
                 f.get("telefone"),
                 f.get("email"),
@@ -2226,7 +2255,11 @@ def cadastro_publico(academia_id):
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="acao" value="atualizar_foto">
 
-      <label>CPF/Documento *</label>
+      <label>Tipo de documento *</label>
+      <select name="tipo_documento" required>
+        <option value="CPF">CPF</option><option value="RG">RG / Identidade</option><option value="CNH">CNH</option>
+      </select>
+      <label>Número do documento *</label>
       <input name="documento" required>
 
       <div class="grid">
@@ -2286,7 +2319,8 @@ def cadastro_publico(academia_id):
 </div>
     <label>Nome completo *</label><input name="nome" required>
     <div class="grid">
-    <div><label>CPF/Documento</label><input name="documento"></div>
+    <div><label>Tipo de documento</label><select name="tipo_documento"><option value="CPF">CPF</option><option value="RG">RG / Identidade</option><option value="CNH">CNH</option></select></div>
+    <div><label>Número do documento</label><input name="documento"></div>
     <div><label>Data de nascimento</label><input type="date" name="nascimento"></div>
     <div><label>Telefone *</label><input name="telefone" required></div>
     <div><label>E-mail</label><input type="email" name="email"></div></div>
@@ -2342,6 +2376,34 @@ def aluno_novo():
 
     if request.method=="POST":
         f=request.form
+        documento=(f.get("documento") or "").strip()
+        tipo_documento=(f.get("tipo_documento") or "CPF").strip().upper()
+        if tipo_documento not in ("CPF","RG","CNH"):
+            tipo_documento="CPF"
+
+        if documento:
+            duplicado=con.cursor().execute(
+                """SELECT id FROM alunos
+                   WHERE academia_id=%s
+                     AND UPPER(COALESCE(tipo_documento,'CPF'))=%s
+                     AND LOWER(TRIM(COALESCE(documento,'')))=LOWER(TRIM(%s))
+                   LIMIT 1""",
+                (aid(),tipo_documento,documento)
+            ).fetchone()
+            if duplicado:
+                con.close()
+                return """
+                <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>Cadastro não realizado</title></head>
+                <body style="font-family:Arial;background:#f3f4f6;margin:0;padding:20px">
+                <div style="max-width:600px;margin:10vh auto;background:white;padding:30px;border-radius:18px;text-align:center">
+                <div style="font-size:70px">⚠️</div>
+                <h1>Cadastro não realizado</h1>
+                <p style="font-size:18px"><b>Já existe um aluno cadastrado com este %s nesta academia.</b></p>
+                <p>Nenhum cadastro duplicado foi criado.</p>
+                <a href="/alunos" style="display:inline-block;padding:14px 24px;background:#111827;color:white;text-decoration:none;border-radius:10px">Voltar para Alunos</a>
+                </div></body></html>
+                """ % tipo_documento
 
         foto_nome=None
         foto_dados=None
@@ -2363,15 +2425,16 @@ def aluno_novo():
                 foto_tipo=tipos[ext]
 
         con.cursor().execute("""INSERT INTO alunos(
-            academia_id,nome,documento,nascimento,telefone,email,
+            academia_id,nome,documento,tipo_documento,nascimento,telefone,email,
             responsavel,telefone_responsavel,modalidade,graduacao,
             observacoes,qr_token,criado_em,endereco,
             contato_emergencia,telefone_emergencia,foto,foto_dados,foto_tipo
-        ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (
             aid(),
             f["nome"],
-            f.get("documento"),
+            documento or None,
+            tipo_documento,
             f.get("nascimento"),
             f.get("telefone"),
             f.get("email"),
@@ -2447,7 +2510,15 @@ def aluno_novo():
       </div>
 
       <div>
-        <label>CPF/Documento</label>
+        <label>Tipo de documento</label>
+        <select name="tipo_documento">
+          <option value="CPF">CPF</option>
+          <option value="RG">RG / Identidade</option>
+          <option value="CNH">CNH</option>
+        </select>
+      </div>
+      <div>
+        <label>Número do documento</label>
         <input name="documento">
       </div>
 
