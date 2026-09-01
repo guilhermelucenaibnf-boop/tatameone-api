@@ -83,6 +83,21 @@ def init_db():
     cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS foto_dados BYTEA")
     cur.execute("ALTER TABLE pre_cadastros ADD COLUMN IF NOT EXISTS foto_tipo TEXT")
 
+    # Garante NO-GI e MMA também para academias já existentes.
+    # Pode rodar novamente sem duplicar modalidades.
+    for modalidade_padrao in ("NO-GI", "MMA"):
+        cur.execute("""
+            INSERT INTO modalidades(academia_id,nome)
+            SELECT a.id,%s
+            FROM academias a
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM modalidades m
+                WHERE m.academia_id=a.id
+                  AND UPPER(TRIM(m.nome))=UPPER(%s)
+            )
+        """, (modalidade_padrao, modalidade_padrao))
+
     # Evolução internacional do módulo de avaliações físicas.
     # ADD COLUMN IF NOT EXISTS preserva avaliações já cadastradas.
     colunas_avaliacao = [
@@ -590,7 +605,7 @@ def primeiro_acesso():
                 for modalidade in (
                     "Musculação","Jiu-Jítsu","Muay Thai","Boxe",
                     "Funcional","Cross Training","Pilates","Yoga",
-                    "Dança","Natação","Personal"
+                    "Dança","Natação","Personal","NO-GI","MMA"
                 ):
                     cur.execute(
                         "INSERT INTO modalidades(academia_id,nome) VALUES(%s,%s)",
@@ -818,7 +833,9 @@ def superadmin_painel():
                         "Yoga",
                         "Dança",
                         "Natação",
-                        "Personal"
+                        "Personal",
+                        "NO-GI",
+                        "MMA"
                     ):
                         cur.execute(
                             """INSERT INTO modalidades
