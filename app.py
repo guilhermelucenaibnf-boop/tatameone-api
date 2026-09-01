@@ -2695,7 +2695,7 @@ def aluno(id):
     <div class="card">
       <h2>👤 Dados do aluno</h2>
 
-      {% if x.foto %}
+      {% if x.foto or x.foto_dados %}
       <div style="text-align:center;margin-bottom:20px">
         <img src="/alunos/foto/{{x.id}}"
              alt="Foto do aluno"
