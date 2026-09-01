@@ -4661,6 +4661,223 @@ def professor_status(id):
     return redirect("/professores")
 
 
+@app.route("/app-aluno/<int:academia_id>")
+def app_aluno(academia_id):
+    con = db()
+
+    academia = con.cursor().execute(
+        """SELECT id,nome
+           FROM academias
+           WHERE id=%s AND ativo=1""",
+        (academia_id,)
+    ).fetchone()
+
+    if not academia:
+        con.close()
+        return "Academia não encontrada.", 404
+
+    gerais = con.cursor().execute(
+        """SELECT titulo,mensagem,criado_em
+           FROM avisos_gerais
+           ORDER BY id DESC
+           LIMIT 10"""
+    ).fetchall()
+
+    locais = con.cursor().execute(
+        """SELECT titulo,mensagem,criado_em
+           FROM avisos
+           WHERE academia_id=%s
+           ORDER BY id DESC
+           LIMIT 20""",
+        (academia_id,)
+    ).fetchall()
+
+    aulas_rows = con.cursor().execute(
+        """SELECT modalidade,professor,dia,horario,semana
+           FROM aulas
+           WHERE academia_id=%s
+             AND ativo=1
+           ORDER BY id DESC""",
+        (academia_id,)
+    ).fetchall()
+
+    con.close()
+
+    return render_template_string("""
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TatameOne Aluno - {{academia.nome}}</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#f3f4f6;
+    color:#111827
+}
+.topo{
+    background:#111827;
+    color:white;
+    padding:24px 18px;
+    text-align:center
+}
+.topo h1{
+    margin:0;
+    font-size:28px
+}
+.topo p{
+    margin:7px 0 0;
+    opacity:.85
+}
+.container{
+    max-width:760px;
+    margin:auto;
+    padding:18px
+}
+h2{
+    font-size:25px;
+    margin:22px 0 14px
+}
+.card{
+    background:white;
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:14px;
+    box-shadow:0 2px 8px rgba(0,0,0,.08)
+}
+.aula{
+    border-left:6px solid #2563eb
+}
+.aviso-academia{
+    border-left:6px solid #2563eb
+}
+.aviso-tatame{
+    border-left:6px solid #e52e3d
+}
+.modalidade{
+    font-size:22px;
+    font-weight:800;
+    margin-bottom:12px
+}
+.linha{
+    font-size:18px;
+    line-height:1.7
+}
+.tipo{
+    display:inline-block;
+    font-size:13px;
+    font-weight:bold;
+    background:#e5e7eb;
+    border-radius:999px;
+    padding:5px 10px;
+    margin-bottom:8px
+}
+.data{
+    color:#6b7280;
+    font-size:14px;
+    margin-top:10px
+}
+.vazio{
+    text-align:center;
+    color:#6b7280;
+    padding:25px
+}
+.rodape{
+    text-align:center;
+    color:#6b7280;
+    font-size:14px;
+    padding:28px 10px
+}
+</style>
+</head>
+
+<body>
+
+<div class="topo">
+    <h1>🥋 {{academia.nome}}</h1>
+    <p>TatameOne • Área do Aluno</p>
+</div>
+
+<div class="container">
+
+<h2>📅 Aulas</h2>
+
+{% for x in aulas %}
+<div class="card aula">
+
+    <div class="modalidade">
+        {{x.modalidade}}
+    </div>
+
+    <div class="linha">
+
+        {% if (x.semana or 'TODAS') == 'A' %}
+            📅 Semana A<br>
+        {% elif (x.semana or 'TODAS') == 'B' %}
+            📅 Semana B<br>
+        {% else %}
+            📅 Todas as semanas<br>
+        {% endif %}
+
+        📆 {{x.dia.replace(' / ', ' e ')}}<br>
+        🕐 {{x.horario}}<br>
+        👨‍🏫 {{x.professor or 'Professor não definido'}}
+
+    </div>
+
+</div>
+{% else %}
+<div class="card vazio">
+    Nenhuma aula disponível no momento.
+</div>
+{% endfor %}
+
+
+<h2>📢 Anúncios</h2>
+
+{% for a in locais %}
+<div class="card aviso-academia">
+    <div class="tipo">🏢 ACADEMIA</div>
+    <div class="modalidade">{{a.titulo}}</div>
+    <div class="linha" style="white-space:pre-wrap">{{a.mensagem}}</div>
+    <div class="data">{{a.criado_em}}</div>
+</div>
+{% endfor %}
+
+{% for a in gerais %}
+<div class="card aviso-tatame">
+    <div class="tipo">🌐 TATAMEONE</div>
+    <div class="modalidade">{{a.titulo}}</div>
+    <div class="linha" style="white-space:pre-wrap">{{a.mensagem}}</div>
+    <div class="data">{{a.criado_em}}</div>
+</div>
+{% endfor %}
+
+{% if not locais and not gerais %}
+<div class="card vazio">
+    Nenhum anúncio disponível no momento.
+</div>
+{% endif %}
+
+<div class="rodape">
+    TatameOne • Somente visualização
+</div>
+
+</div>
+</body>
+</html>
+""",
+        academia=academia,
+        aulas=aulas_rows,
+        gerais=gerais,
+        locais=locais
+    )
+
+
 @app.route("/aulas", methods=["GET","POST"])
 @login_required
 @permissao_required("aulas")
