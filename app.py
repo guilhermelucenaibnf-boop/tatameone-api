@@ -4661,6 +4661,82 @@ def professor_status(id):
     return redirect("/professores")
 
 
+@app.route("/app-aluno/<int:academia_id>/manifest.webmanifest")
+def app_aluno_manifest(academia_id):
+    manifest = """
+{
+  "name": "TatameOne Aluno",
+  "short_name": "TatameOne",
+  "description": "Aulas e anúncios da academia",
+  "start_url": "/app-aluno/%s",
+  "scope": "/app-aluno/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/static/img/logo_tatameone.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+""" % academia_id
+
+    return Response(
+        manifest,
+        mimetype="application/manifest+json",
+        headers={"Cache-Control":"no-cache"}
+    )
+
+
+@app.route("/app-aluno/sw.js")
+def app_aluno_sw():
+    js = r"""
+const CACHE = "tatameone-aluno-v1";
+
+self.addEventListener("install", event => {
+    self.skipWaiting();
+});
+
+self.addEventListener("activate", event => {
+    event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", event => {
+    if (event.request.method !== "GET") return;
+
+    const url = new URL(event.request.url);
+
+    if (url.origin !== self.location.origin) return;
+
+    if (
+        !url.pathname.startsWith("/app-aluno/") &&
+        url.pathname !== "/static/img/logo_tatameone.png"
+    ) return;
+
+    event.respondWith(
+        fetch(event.request)
+        .then(response => {
+            const copia = response.clone();
+            caches.open(CACHE).then(cache => {
+                cache.put(event.request, copia);
+            });
+            return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+});
+"""
+
+    return Response(
+        js,
+        mimetype="application/javascript",
+        headers={"Cache-Control":"no-cache"}
+    )
+
+
 @app.route("/app-aluno/<int:academia_id>")
 def app_aluno(academia_id):
     con = db()
@@ -4709,6 +4785,20 @@ def app_aluno(academia_id):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="TatameOne Aluno">
+
+<link rel="manifest"
+      href="/app-aluno/{{academia.id}}/manifest.webmanifest">
+
+<link rel="apple-touch-icon"
+      href="/static/img/logo_tatameone.png">
+
+<link rel="icon"
+      href="/static/img/logo_tatameone.png">
+
 <title>TatameOne Aluno - {{academia.nome}}</title>
 
 <style>
@@ -4868,6 +4958,18 @@ h2{
 </div>
 
 </div>
+
+<script>
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function() {
+        navigator.serviceWorker.register(
+            "/app-aluno/sw.js",
+            {scope: "/app-aluno/"}
+        ).catch(function() {});
+    });
+}
+</script>
+
 </body>
 </html>
 """,
