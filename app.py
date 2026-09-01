@@ -2650,6 +2650,16 @@ def aluno(id):
         (id,aid())
     ).fetchall()
 
+    anterior=con.cursor().execute(
+        "SELECT id FROM alunos WHERE academia_id=%s AND id<%s ORDER BY id DESC LIMIT 1",
+        (aid(),id)
+    ).fetchone()
+
+    proximo=con.cursor().execute(
+        "SELECT id FROM alunos WHERE academia_id=%s AND id>%s ORDER BY id ASC LIMIT 1",
+        (aid(),id)
+    ).fetchone()
+
     con.close()
 
     # Gerar QR Code real do aluno
@@ -2661,6 +2671,18 @@ def aluno(id):
         qr_img = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
 
     return page(x["nome"],"""
+    <div class="actions" style="margin-bottom:18px">
+      {% if anterior %}
+      <a class="btn" href="/alunos/{{anterior.id}}">← Anterior</a>
+      {% endif %}
+
+      <a class="btn" href="/alunos">👥 Voltar para Alunos</a>
+
+      {% if proximo %}
+      <a class="btn" href="/alunos/{{proximo.id}}">Próximo →</a>
+      {% endif %}
+    </div>
+
     <h1>{{x.nome}}</h1>
 
     <p>
@@ -2849,7 +2871,8 @@ def aluno(id):
       </p>
     </div>
 
-    """,x=x,pags=pags,checks=checks,qr_img=qr_img)
+    """,x=x,pags=pags,checks=checks,qr_img=qr_img,
+        anterior=anterior,proximo=proximo)
 
 
 @app.route("/alunos/<int:id>/desativar", methods=["POST"])
